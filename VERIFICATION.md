@@ -1,6 +1,23 @@
 # Verification
 
-Checked on November 3, 2026 (Asia/Manila). This report covers the web implementation, simulated Android bridge behavior, and Android project preparation, not an APK build or physical screen-lock/GPS accuracy.
+Checked on November 3, 2026 (Asia/Manila). This report covers the web implementation, simulated Android/iOS bridge behavior, and native project/workflow preparation. Native compilation, Apple signing/upload, and physical screen-lock/GPS accuracy are not verified here.
+
+## iOS addition
+
+- PASS: `@capacitor/ios` is pinned to 8.6.0, matching the existing core, CLI, and Android runtime. The generated iOS project uses Swift Package Manager and is included in the working tree.
+- PASS: `npm run ios:sync` completed a strict production Angular build (639.69 kB initial raw bundle), copied assets, and registered the three existing location/notification plugins for iOS.
+- PASS: `npx cap sync android` also completed with the same three plugins after the iOS addition.
+- PASS: all 6 calculation tests and all 14 Playwright tests passed. The additional iOS native-bridge case covers the permission-dialog visibility transition, native permission-request option, no Android notification request, a simulated six-minute hidden interval, batched route rendering, and Finish cleanup. Browser and Android regression checks remain passing.
+- PASS: all 4 Python signing-helper tests passed, including profile/team/app matching, rejecting development/Ad Hoc/expired profiles, limiting signing changes to the App configurations, repeatable updates without duplicate settings, and failing on an unexpected project structure.
+- PASS: both workflows passed `actionlint` 1.7.12 with ShellCheck disabled on Windows. Git Bash parsed all 12 iOS shell steps without syntax errors.
+- PASS: the iOS workflow's exact QR script produced a PNG decoded by ZXing to the exact test TestFlight invitation URL. It also rejected an unrelated download URL. This is a test fixture, not an available invitation, and no example QR is shipped in the app.
+- PASS: the iOS plist parses and contains both required location explanations and the location background mode. The Xcode target also declares Background Modes capability.
+- PASS: build jobs have read-only repository permission. Only the invitation-publishing job has write permission; its condition excludes pull requests. Apple secrets are used only by the manually selected signed-upload steps and are removed from the ephemeral runner afterward.
+- PASS: Git diff shows no changes to the Android workflow, calculation helper, map component, or sports styles. The app changes select iOS background tracking and use the correct native platform name in existing text; no new visual sections or image assets were added.
+- PASS: the existing antislop gate below remains applicable to the retained interface. The new platform wording was exercised at the phone viewport, and the existing responsive/keyboard checks passed. Authored comments add only the reason signing is scoped to the App target; generated native comments are preserved. No comment-hygiene-only executable changes were made.
+- PASS: `IOS_SETUP.md` documents simulator versus physical-device distribution, every GitHub variable/secret, TestFlight review/invitation setup, placeholder identity/icon, and real-device verification steps.
+
+Pending external verification: run the workflow on GitHub's macOS runner, compile/archive in Xcode, provide Apple signing credentials, upload/process the build, obtain beta approval, configure the real public invitation, and test a locked-screen trip on a physical iPhone. No IPA, live iOS download, or working TestFlight invitation has been produced from this Windows workspace.
 
 ## Recorded checks
 
@@ -13,7 +30,7 @@ Checked on November 3, 2026 (Asia/Manila). This report covers the web implementa
 - PASS: `ionic build --no-interactive` completed successfully after the target correction.
 - PASS: `npm run build` completed after the sports redesign with strict Angular template and TypeScript checking.
 - PASS: `npm test` completed with 6 passing calculation tests: Haversine distance, coordinate validity, drift/jump filtering, traveled segments, unit conversions, and durations.
-- PASS: the original 6 browser tests passed before adding the map. The final suite passes all 13 tests: the original 6, four map checks, and three simulated Android background checks. GPS/Android-bridge fixtures exist only in test code.
+- PASS: the original 6 browser tests passed before adding the map. Before iOS, the suite passed all 13 tests: the original 6, four map checks, and three simulated Android background checks. It now passes 14 including the iOS case recorded above. GPS/native-bridge fixtures exist only in test code.
 - PASS: `npx cap sync android` copied the production bundle and registered Geolocation 8.2.4, Background Geolocation 1.3.1, and Local Notifications 8.3.1. The native configuration contains `useLegacyBridge: true`.
 - PASS: Android manifest contains coarse/fine location, location foreground-service, and notification permissions. The location-service declaration is supplied by the background plugin; GPS hardware remains optional in the app manifest.
 - PASS: browser console inspection captured no console errors or uncaught page errors while opening the page, changing units, and scrolling.
@@ -147,4 +164,4 @@ The map and screen-off additions were checked at `http://127.0.0.1:8103` using `
 
 ## Practical limits
 
-Android SDK 36 and a connected Android phone were not available here. Native APK compilation, actual permission prompts, physical battery behavior, GPS accuracy, and real screen-lock behavior remain unverified. Android now uses a location foreground service with a persistent notification; a browser still needs to stay visible. Device verification should include a moving trip with the screen locked for at least six minutes, followed by Finish and confirmation that the notification disappears. A fully powered-off or force-stopped phone/app cannot keep this in-memory session recording. The app stores no trip history and uses manual Finish rather than automatic arrival or address lookup.
+Android SDK 36, Xcode, and connected Android/iOS phones were not available here. Native compilation, actual permission prompts, physical battery behavior, GPS accuracy, and real screen-lock behavior remain unverified. Android uses a location foreground service with a persistent notification; iOS uses the native background-location watcher and configured location background mode. A browser still needs to stay visible. Device verification should include a moving trip with the screen locked for at least six minutes, followed by Finish and confirmation that location recording stops. A fully powered-off or force-stopped phone/app cannot keep this in-memory session recording. The app stores no trip history and uses manual Finish rather than automatic arrival or address lookup.

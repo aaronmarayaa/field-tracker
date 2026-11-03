@@ -1,0 +1,220 @@
+name: iOS and TestFlight
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      upload_testflight:
+        description: Build a signed iPhone app and upload it to App Store Connect
+        type: boolean
+        required: true
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build iOS
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - name: Check out the project
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+
+      - name: Check Apple configuration
+        if: inputs.upload_testflight == true
+        env:
+          IOS_TEAM_ID: ${{ vars.IOS_TEAM_ID }}
+          IOS_BUNDLE_ID: ${{ vars.IOS_BUNDLE_ID }}
+          IOS_DISTRIBUTION_CERTIFICATE_BASE64: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_BASE64 }}
+          IOS_DISTRIBUTION_CERTIFICATE_PASSWORD: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_PASSWORD }}
+          IOS_PROVISION_PROFILE_BASE64: ${{ secrets.IOS_PROVISION_PROFILE_BASE64 }}
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+        run: |
+          for name in IOS_TEAM_ID IOS_BUNDLE_ID IOS_DISTRIBUTION_CERTIFICATE_BASE64 IOS_DISTRIBUTION_CERTIFICATE_PASSWORD IOS_PROVISION_PROFILE_BASE64 APP_STORE_CONNECT_KEY_ID APP_STORE_CONNECT_ISSUER_ID APP_STORE_CONNECT_PRIVATE_KEY; do
+            if [[ -z "${!name}" ]]; then
+              echo "::error::Missing $name. Follow IOS_SETUP.md before selecting upload_testflight."
+              exit 1
+            fi
+          done
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check calculations and signing configuration
+        run: |
+          npm test
+          python -m unittest discover -s tests -p 'ios_signing_test.py'
+
+      - name: Build web app and sync iOS
+        run: npm run ios:sync
+
+      - name: Build unsigned simulator app
+        if: inputs.upload_testflight != true
+        run: |
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release \
+            -destination 'generic/platform=iOS Simulator' -derivedDataPath build/ios-simulator \
+            CODE_SIGNING_ALLOWED=NO build
+          ditto -c -k --sequesterRsrc --keepParent \
+            build/ios-simulator/Build/Products/Release-iphonesimulator/App.app \
+            build/field-tracker-simulator.zip
+          echo 'Simulator build only: download the artifact for an Xcode simulator. Use the manual TestFlight upload for physical iPhones; see IOS_SETUP.md.' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload simulator app
+        if: inputs.upload_testflight != true
+        uses: actions/upload-artifact@v7
+        with:
+          name: field-tracker-ios-simulator
+          path: build/field-tracker-simulator.zip
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Install Apple signing credentials
+        if: inputs.upload_testflight == true
+        env:
+          IOS_TEAM_ID: ${{ vars.IOS_TEAM_ID }}
+          IOS_BUNDLE_ID: ${{ vars.IOS_BUNDLE_ID }}
+          IOS_DISTRIBUTION_CERTIFICATE_BASE64: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_BASE64 }}
+          IOS_DISTRIBUTION_CERTIFICATE_PASSWORD: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_PASSWORD }}
+          IOS_PROVISION_PROFILE_BASE64: ${{ secrets.IOS_PROVISION_PROFILE_BASE64 }}
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+        run: |
+          umask 077
+          printf '%s' "$IOS_DISTRIBUTION_CERTIFICATE_BASE64" | base64 --decode > "$RUNNER_TEMP/certificate.p12"
+          printf '%s' "$IOS_PROVISION_PROFILE_BASE64" | base64 --decode > "$RUNNER_TEMP/profile.mobileprovision"
+          KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -base64 32)"
+          echo "::add-mask::$KEYCHAIN_PASSWORD"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$RUNNER_TEMP/certificate.p12" -P "$IOS_DISTRIBUTION_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH" "$HOME/Library/Keychains/login.keychain-db"
+          security cms -D -i "$RUNNER_TEMP/profile.mobileprovision" > "$RUNNER_TEMP/profile.plist"
+          python .github/scripts/prepare-ios-signing.py
+
+      - name: Archive and export signed iPhone app
+        if: inputs.upload_testflight == true
+        run: |
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release \
+            -destination 'generic/platform=iOS' -archivePath build/FieldTracker.xcarchive archive
+          xcodebuild -exportArchive -archivePath build/FieldTracker.xcarchive \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" -exportPath build/ios-export
+
+      - name: Upload signed IPA artifact
+        if: inputs.upload_testflight == true
+        uses: actions/upload-artifact@v7
+        with:
+          name: field-tracker-ios-signed
+          path: build/ios-export/*.ipa
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload to App Store Connect
+        if: inputs.upload_testflight == true
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+        run: |
+          IPA_PATH="$(find "$GITHUB_WORKSPACE/build/ios-export" -maxdepth 1 -name '*.ipa' -print -quit)"
+          test -n "$IPA_PATH"
+          cd "$RUNNER_TEMP"
+          xcrun altool --upload-app --type ios --file "$IPA_PATH" \
+            --apiKey "$APP_STORE_CONNECT_KEY_ID" --apiIssuer "$APP_STORE_CONNECT_ISSUER_ID"
+          echo 'Upload accepted by App Store Connect. Wait for Apple processing, complete export compliance, and add the build to a TestFlight group. External testing requires Apple beta review; see IOS_SETUP.md.' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Remove Apple signing credentials
+        if: always() && inputs.upload_testflight == true
+        run: |
+          if [[ -f "$RUNNER_TEMP/app-signing.keychain-db" ]]; then
+            security delete-keychain "$RUNNER_TEMP/app-signing.keychain-db"
+          fi
+          if [[ -n "${IOS_PROFILE_UUID:-}" ]]; then
+            rm -f "$HOME/Library/MobileDevice/Provisioning Profiles/$IOS_PROFILE_UUID.mobileprovision" \
+              "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles/$IOS_PROFILE_UUID.mobileprovision"
+          fi
+          rm -f "$RUNNER_TEMP/certificate.p12" "$RUNNER_TEMP/profile.mobileprovision" \
+            "$RUNNER_TEMP/profile.plist" "$RUNNER_TEMP/ExportOptions.plist"
+          rm -f "$RUNNER_TEMP"/private_keys/AuthKey_*.p8
+
+      - name: Explain TestFlight QR setup
+        if: success() && vars.TESTFLIGHT_PUBLIC_URL == ''
+        run: echo 'No TestFlight invitation QR yet. After Apple approves external testing, enable a group public link and save it as the TESTFLIGHT_PUBLIC_URL repository variable. Run this workflow again with upload_testflight unchecked to publish the QR.' >> "$GITHUB_STEP_SUMMARY"
+
+  invite:
+    name: Publish TestFlight invitation QR
+    needs: build
+    if: vars.TESTFLIGHT_PUBLIC_URL != '' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)))
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+
+      - name: Generate TestFlight invitation QR
+        env:
+          TESTFLIGHT_PUBLIC_URL: ${{ vars.TESTFLIGHT_PUBLIC_URL }}
+        run: |
+          python -m pip install 'qrcode[pil]==8.2'
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          import re
+          import qrcode
+
+          url = os.environ['TESTFLIGHT_PUBLIC_URL'].strip()
+          if not re.fullmatch(r'https://testflight\.apple\.com/join/[A-Za-z0-9]+/?', url):
+              raise SystemExit('TESTFLIGHT_PUBLIC_URL must be an https://testflight.apple.com/join/... invitation.')
+          qrcode.make(url).save('testflight-qr.png')
+          Path('testflight-url.txt').write_text(url + '\n')
+          PY
+
+      - name: Publish invitation and show QR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          TAG="ios-invite-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          printf '%s\n' 'Scan this QR to join the configured TestFlight group. Install Apple TestFlight first. Apple approval, available builds, and the group tester limit control access. This invitation does not guarantee that this workflow build is available yet.' > release-notes.txt
+          gh release create "$TAG" testflight-qr.png testflight-url.txt --target "$COMMIT_SHA" \
+            --title "Field Tracker iOS invitation ${GITHUB_RUN_NUMBER}" --prerelease --notes-file release-notes.txt
+          QR_URL="https://github.com/${GH_REPO}/releases/download/${TAG}/testflight-qr.png"
+          URL="$(cat testflight-url.txt)"
+          {
+            echo '## Install with TestFlight'
+            echo "[Join the TestFlight group]($URL)"
+            echo "![TestFlight invitation QR]($QR_URL)"
+            echo 'Install Apple TestFlight first. Apple processing, external beta approval, and group availability apply. This QR points to the invitation group, not directly to an IPA.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload invitation bundle
+        uses: actions/upload-artifact@v7
+        with:
+          name: field-tracker-ios-testflight-qr
+          path: |
+            testflight-qr.png
+            testflight-url.txt
+          if-no-files-found: error
+          retention-days: 14

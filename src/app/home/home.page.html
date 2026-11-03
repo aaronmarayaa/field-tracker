@@ -79,7 +79,7 @@
           } @else {
             <ion-button class="primary-action" expand="block" (click)="startTrip()"><span class="start-mark" aria-hidden="true"></span>{{ status() === 'finished' ? 'Start another trip' : 'Start trip' }}</ion-button>
           }
-          <p class="control-note">{{ status() === 'finished' ? 'Starting again clears this trip. Nothing is saved after reloading.' : canTrackInBackground ? 'Android keeps recording with the screen locked. Tap Finish trip to stop.' : 'Keep this app open and your screen awake.' }}</p>
+          <p class="control-note">{{ status() === 'finished' ? 'Starting again clears this trip. Nothing is saved after reloading.' : canTrackInBackground ? platformName + ' keeps recording with the screen locked. Tap Finish trip to stop.' : 'Keep this app open and your screen awake.' }}</p>
         </div>
 
         @if (error()) {
@@ -144,7 +144,7 @@
 
     <footer class="page-footer">
       <span>Made for the miles ahead.</span>
-      <span>{{ canTrackInBackground ? 'Android background GPS' : 'Foreground GPS' }} · No account needed</span>
+      <span>{{ canTrackInBackground ? platformName + ' background GPS' : 'Foreground GPS' }} · No account needed</span>
     </footer>
   </main>
 </ion-content>

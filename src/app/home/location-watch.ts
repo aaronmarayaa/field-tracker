@@ -7,11 +7,12 @@ const BackgroundGeolocation = registerPlugin<BackgroundGeolocationPlugin>('Backg
 const backgroundPrefix = 'background:';
 
 export function supportsBackgroundTracking(): boolean {
-  return Capacitor.getPlatform() === 'android';
+  const platform = Capacitor.getPlatform();
+  return platform === 'android' || platform === 'ios';
 }
 
 export async function prepareBackgroundTracking(): Promise<void> {
-  if (!supportsBackgroundTracking()) return;
+  if (Capacitor.getPlatform() !== 'android') return;
 
   let permission = await LocalNotifications.checkPermissions();
   if (permission.display !== 'granted') permission = await LocalNotifications.requestPermissions();
@@ -26,7 +27,7 @@ export async function startLocationWatch(options: PositionOptions, callback: Wat
   const id = await BackgroundGeolocation.addWatcher({
     backgroundTitle: 'Field Tracker is recording',
     backgroundMessage: 'Recording GPS with the screen off. Tap to open the trip.',
-    requestPermissions: false,
+    requestPermissions: Capacitor.getPlatform() === 'ios',
     stale: false,
     distanceFilter: 0,
   }, (location, error) => {

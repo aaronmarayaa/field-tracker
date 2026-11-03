@@ -19,6 +19,7 @@ import {
 })
 export class HomePage implements OnDestroy {
   readonly canTrackInBackground = supportsBackgroundTracking();
+  readonly platformName = Capacitor.getPlatform() === 'ios' ? 'iOS' : 'Android';
   readonly status = signal<'ready' | 'locating' | 'tracking' | 'finished'>('ready');
   readonly unit = signal<DistanceUnit>('km');
   readonly startPoint = signal<TrackPoint | null>(null);
@@ -86,7 +87,7 @@ export class HomePage implements OnDestroy {
 
     try {
       if (!Capacitor.isNativePlatform() && (!window.isSecureContext || !navigator.geolocation)) {
-        throw new Error('Browser location needs HTTPS or localhost. Use the Android app on your phone.');
+        throw new Error('Browser location needs HTTPS or localhost. Use the mobile app on your phone.');
       }
       // The browser requests permission through getCurrentPosition instead.
       if (Capacitor.isNativePlatform()) {

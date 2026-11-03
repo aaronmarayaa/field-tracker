@@ -1,11 +1,11 @@
 import { expect, test, type Page } from '@playwright/test';
 
-async function mockAndroid(page: Page): Promise<void> {
+async function mockNative(page: Page, platform: 'android' | 'ios' = 'android'): Promise<void> {
   await page.route('https://tile.openstreetmap.org/**', (route) => route.fulfill({
     contentType: 'image/svg+xml',
     body: '<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><rect width="256" height="256" fill="#e8ebdf"/></svg>',
   }));
-  await page.addInitScript(() => {
+  await page.addInitScript((platform) => {
     let watcher: ((location: unknown, error?: unknown) => void) | null = null;
     let notificationsDenied = false;
     let notificationPermission = 'prompt';
@@ -31,6 +31,7 @@ async function mockAndroid(page: Page): Promise<void> {
         }
       }
       if (plugin === 'LocalNotifications') {
+        if (platform === 'ios') throw new Error('iOS must not request the Android notification permission.');
         if (method === 'requestPermissions') {
           hidden(true);
           await Promise.resolve();
@@ -53,10 +54,14 @@ async function mockAndroid(page: Page): Promise<void> {
       watcher = callback;
       watcherOptions = options;
       watcherCount++;
+      if (platform === 'ios') {
+        hidden(true);
+        hidden(false);
+      }
       return `native-watcher-${watcherCount}`;
     };
     Object.assign(window, {
-      androidBridge: {},
+      ...(platform === 'android' ? { androidBridge: {} } : { webkit: { messageHandlers: { bridge: {} } } }),
       Capacitor: {
         nativePromise,
         nativeCallback,
@@ -78,7 +83,7 @@ async function mockAndroid(page: Page): Promise<void> {
         },
       },
     });
-  });
+  }, platform);
 }
 
 async function nativeAction(page: Page, action: string, args: unknown[] = []): Promise<unknown> {
@@ -88,43 +93,47 @@ async function nativeAction(page: Page, action: string, args: unknown[] = []): P
   }, { action, args });
 }
 
-test('Android keeps its native watcher when hidden and retains every batched route point', async ({ page }) => {
-  const errors: string[] = [];
-  page.on('pageerror', (error) => errors.push(error.message));
-  await mockAndroid(page);
-  await page.goto('/');
-  await page.getByRole('button', { name: 'Start trip', exact: true }).click();
-  await expect(page.getByText('Recording your trip', { exact: true })).toBeVisible();
-  await expect(page.locator('.route-location-marker')).toBeAttached();
-  await expect.poll(() => nativeAction(page, 'state')).toMatchObject({ watching: true, watcherCount: 1 });
-  const state = await nativeAction(page, 'state') as { watcherOptions: Record<string, unknown> };
-  expect(state.watcherOptions['backgroundMessage']).toBeTruthy();
-  expect(state.watcherOptions['backgroundTitle']).toBe('Field Tracker is recording');
-  expect(state.watcherOptions['stale']).toBe(false);
+for (const platform of ['android', 'ios'] as const) {
+  test(`${platform} keeps its native watcher when hidden and retains every batched route point`, async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    await mockNative(page, platform);
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Start trip', exact: true }).click();
+    await expect(page.getByText('Recording your trip', { exact: true })).toBeVisible();
+    await expect(page.locator('.route-location-marker')).toBeAttached();
+    await expect.poll(() => nativeAction(page, 'state')).toMatchObject({ watching: true, watcherCount: 1 });
+    const state = await nativeAction(page, 'state') as { watcherOptions: Record<string, unknown> };
+    expect(state.watcherOptions['backgroundMessage']).toBeTruthy();
+    expect(state.watcherOptions['backgroundTitle']).toBe('Field Tracker is recording');
+    expect(state.watcherOptions['stale']).toBe(false);
+    expect(state.watcherOptions['requestPermissions']).toBe(platform === 'ios');
+    await expect(page.locator('.control-note')).toContainText(`${platform === 'ios' ? 'iOS' : 'Android'} keeps recording`);
 
-  await page.clock.install();
-  await nativeAction(page, 'hidden', [true]);
-  await page.clock.fastForward(360000);
-  await nativeAction(page, 'emitBatch');
-  await nativeAction(page, 'hidden', [false]);
-  await expect(page.getByText('Recording your trip', { exact: true })).toBeVisible();
-  await expect(page.getByTestId('duration')).toContainText('00:06:');
-  await expect(page.getByTestId('speed')).toHaveText('10.8');
-  await expect(page.locator('.map-coordinate')).toHaveText('14.60020, 120.98570');
-  await expect.poll(async () => {
-    const path = await page.locator('.route-line').getAttribute('d');
-    return (path?.match(/L/g) ?? []).length;
-  }).toBeGreaterThanOrEqual(3);
-  expect(Number(await page.getByTestId('distance').innerText())).toBeGreaterThan(0.1);
+    await page.clock.install();
+    await nativeAction(page, 'hidden', [true]);
+    await page.clock.fastForward(360000);
+    await nativeAction(page, 'emitBatch');
+    await nativeAction(page, 'hidden', [false]);
+    await expect(page.getByText('Recording your trip', { exact: true })).toBeVisible();
+    await expect(page.getByTestId('duration')).toContainText('00:06:');
+    await expect(page.getByTestId('speed')).toHaveText('10.8');
+    await expect(page.locator('.map-coordinate')).toHaveText('14.60020, 120.98570');
+    await expect.poll(async () => {
+      const path = await page.locator('.route-line').getAttribute('d');
+      return (path?.match(/L/g) ?? []).length;
+    }).toBeGreaterThanOrEqual(3);
+    expect(Number(await page.getByTestId('distance').innerText())).toBeGreaterThan(0.1);
 
-  await page.getByRole('button', { name: 'Finish trip', exact: true }).click();
-  await expect(page.getByText('Trip finished', { exact: true })).toBeVisible();
-  await expect.poll(() => nativeAction(page, 'state')).toMatchObject({ watching: false, removalCount: 1 });
-  expect(errors).toEqual([]);
-});
+    await page.getByRole('button', { name: 'Finish trip', exact: true }).click();
+    await expect(page.getByText('Trip finished', { exact: true })).toBeVisible();
+    await expect.poll(() => nativeAction(page, 'state')).toMatchObject({ watching: false, removalCount: 1 });
+    expect(errors).toEqual([]);
+  });
+}
 
 test('denied Android notifications leave Start available without starting a service', async ({ page }) => {
-  await mockAndroid(page);
+  await mockNative(page);
   await page.goto('/');
   await nativeAction(page, 'denyNotifications');
   await page.getByRole('button', { name: 'Start trip', exact: true }).click();
@@ -134,7 +143,7 @@ test('denied Android notifications leave Start available without starting a serv
 });
 
 test('Android starts one background watcher per trip and removes it on each Finish', async ({ page }) => {
-  await mockAndroid(page);
+  await mockNative(page);
   await page.goto('/');
   await page.getByRole('button', { name: 'Start trip', exact: true }).click();
   await expect.poll(() => nativeAction(page, 'state')).toMatchObject({ watcherCount: 1, watching: true });

@@ -15,7 +15,7 @@ Open the local URL printed in the terminal. Allow location when asked. Start out
 
 If the Ionic CLI is installed, you can also run `ionic serve`. The Angular project is named `app` to match the Ionic CLI's default target, so no extra project flag is needed.
 
-Browser location needs HTTPS or localhost. Opening an HTTP address from another device on your Wi-Fi will usually prevent location access. Use the Android app for a walk with your phone.
+Browser location needs HTTPS or localhost. Opening an HTTP address from another device on your Wi-Fi will usually prevent location access. Use a native Android or iOS build for a walk with your phone.
 
 ## What it records
 
@@ -33,6 +33,8 @@ On **Android**, start the trip while the app is visible and allow precise locati
 
 In a **browser**, keep the app visible and the screen awake. Browser tracking still ends when the page becomes hidden.
 
+On **iOS**, the native app uses the same background-location plugin, with iOS location permission descriptions and background capability configured. Allow precise/background location, start while visible, then lock the screen. Tap **Finish trip** to remove the watcher. See [iOS setup and TestFlight](IOS_SETUP.md) for signing, installation, and the required real-device check.
+
 A fully powered-off phone cannot record GPS. Force-stopping the app or Android terminating its process also ends this in-memory session. Some phones' battery restrictions can interrupt services; if that happens, allow unrestricted battery use for Field Tracker in Android settings.
 
 Trip data stays in memory. Starting another trip clears it; reloading or closing the app loses it. There is no account, database, or trip history.
@@ -44,7 +46,7 @@ Trip data stays in memory. Starting another trip clears it; reloading or closing
 | `src/app/home/home.page.html` | The screen: readings, controls, and location log. |
 | `src/app/home/home.page.ts` | `startTrip()`, `recordPosition()`, and `finishTrip()`. |
 | `src/app/home/tracking.ts` | Distance, unit conversions, and time formatting. |
-| `src/app/home/location-watch.ts` | Chooses the Android background watcher or the browser watcher, and stops the correct one. |
+| `src/app/home/location-watch.ts` | Chooses the native Android/iOS background watcher or the browser watcher, and stops the correct one. |
 | `src/app/tracking-map/tracking-map.component.ts` | Creates the map, draws accepted GPS points, and cleans up its map instance. |
 | `src/app/tracking-map/tracking-map.component.html` | Map states, legend, and Center on me control. |
 | `src/app/home/home.page.scss` | Mobile-first layout, with medium and wide states. |
@@ -56,7 +58,7 @@ Angular **signals** are values that update the screen when they change. `unit()`
 
 The big stopwatch shows hours, minutes, and seconds. Its orange ring sweeps once per minute using the elapsed seconds. The HTML passes an angle to the CSS through `--elapsed-angle`; no separate animation timer is needed. On Finish, both the digits and the ring freeze.
 
-`Geolocation.getCurrentPosition()` finds the start. The `location-watch.ts` helper selects the watcher: browsers use `Geolocation.watchPosition()`; Android uses `BackgroundGeolocation.addWatcher()` with a persistent notification. Finish removes that same watcher. A session number lets the page ignore late responses after Cancel or Finish.
+`Geolocation.getCurrentPosition()` finds the start. The `location-watch.ts` helper selects the watcher: browsers use `Geolocation.watchPosition()`; Android and iOS use `BackgroundGeolocation.addWatcher()`. Android also requires a persistent notification. iOS requests background location authorization through the plugin. Finish removes that same watcher. A session number lets the page ignore late responses after Cancel or Finish.
 
 The Android helper converts native fixes into the same position format used by the existing calculations. Capacitor's `android.useLegacyBridge` is enabled because the [background-location plugin](https://github.com/capacitor-community/background-geolocation) requires it for continued background delivery.
 
@@ -95,7 +97,11 @@ The production web build, browser/native-bridge simulations, and Capacitor Andro
 
 For a phone check, start a trip outdoors, confirm the persistent recording notification, lock the screen for at least six minutes while moving, and reopen the app. Check that the stopwatch, distance, and route include that period. Finish the trip and confirm that the recording notification disappears.
 
-iOS is not configured in this Windows project. Adding it later requires `@capacitor/ios`, a Mac with Xcode, and the location descriptions required by the [Geolocation plugin](https://capacitorjs.com/docs/apis/geolocation).
+## Build for iPhone
+
+The native `ios/` project and `.github/workflows/ios.yml` are included. Pushes and pull requests build an unsigned simulator app on a GitHub macOS runner. A manual run can sign and upload a physical-iPhone build to App Store Connect after you configure the Apple credentials. A configured TestFlight public invitation link produces a downloadable QR and an Actions summary link/image.
+
+Follow [IOS_SETUP.md](IOS_SETUP.md) for the GitHub variables/secrets, Apple setup, and tester instructions. Testers install through Apple TestFlight; the simulator ZIP and signed IPA artifact are not ordinary public iPhone installers. No Apple account credentials are included in this project.
 
 ## Build an APK with GitHub Actions
 
@@ -134,6 +140,6 @@ npx playwright install chromium
 npm run test:ui
 ```
 
-Calculation tests use Node's built-in test runner. Browser tests cover the original controls plus map movement, route reset, unavailable tiles, recentering, zoom, and map failure isolation. Native-bridge fixtures verify Android hidden-state recording, batched route fixes, notification denial, and watcher cleanup. These simulations do not replace a real Android screen-lock test. Test coordinates and map tiles are fixtures, never preloaded into the app.
+Calculation tests use Node's built-in test runner. Browser tests cover the original controls plus map movement, route reset, unavailable tiles, recentering, zoom, and map failure isolation. Native-bridge fixtures verify Android and iOS hidden-state recording, batched route fixes, native permission behavior, and watcher cleanup. These simulations do not replace real-device screen-lock tests. Test coordinates and map tiles are fixtures, never preloaded into the app. The iOS workflow also runs `python -m unittest discover -s tests -p 'ios_signing_test.py'` to check its signing configuration helper.
 
 Read `VERIFICATION.md` for the recorded checks and the antislop delivery gate.
