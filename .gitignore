@@ -1,0 +1,9 @@
+node_modules/
+www/
+.angular/
+test-results/
+playwright-report/
+android/.gradle/
+android/local.properties
+android/**/build/
+.DS_Store

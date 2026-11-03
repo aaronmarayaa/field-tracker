@@ -1,0 +1,142 @@
+<ion-content [fullscreen]="true">
+  <main class="tracker">
+    <header class="page-header">
+      <div class="wordmark">Field Tracker<span class="wordmark-period">.</span></div>
+      <div class="unit-control" role="group" aria-label="Distance units">
+        <button type="button" [class.selected]="unit() === 'km'" [attr.aria-pressed]="unit() === 'km'" (click)="unit.set('km')">km</button>
+        <button type="button" [class.selected]="unit() === 'mi'" [attr.aria-pressed]="unit() === 'mi'" (click)="unit.set('mi')">mi</button>
+      </div>
+    </header>
+
+    <div class="trip-heading">
+      <div>
+        <p class="section-kicker">Your pace. Your progress.</p>
+        <h1>{{ status() === 'finished' ? 'Session complete.' : 'Make your move.' }}</h1>
+      </div>
+      <p class="trip-state" role="status">
+        <span class="state-dot" [class.recording]="status() === 'tracking'" aria-hidden="true"></span>
+        @switch (status()) {
+          @case ('locating') { Finding your location }
+          @case ('tracking') { Recording your trip }
+          @case ('finished') { Trip finished }
+          @default { Ready when you are }
+        }
+      </p>
+    </div>
+
+    <div class="workspace">
+      <aside class="sport-visual" aria-label="Running photography">
+        <img class="track-photo" src="assets/sports/track-runner.png" alt="Runner rounding the lanes of a red athletics track" width="561" height="1000" fetchpriority="high" />
+        <img class="motion-photo" src="assets/sports/runner-motion.png" alt="Black and white photograph of a runner in motion" width="1024" height="1536" decoding="async" />
+        <img class="boardwalk-photo" src="assets/sports/runners-boardwalk.png" alt="Runners striding along a boardwalk in the sunshine" width="640" height="850" decoding="async" />
+        <div class="photo-caption" aria-hidden="true"><span>Go the distance.</span><span>One trip at a time.</span></div>
+      </aside>
+
+      <section class="instrument" aria-label="Trip readings">
+        <div class="instrument-heading"><h2>Stopwatch</h2><span>Hours / minutes / seconds</span></div>
+        <div class="stopwatch-dial" [class.is-recording]="status() === 'tracking'" [style.--elapsed-angle]="(elapsedSeconds % 60) * 6 + 'deg'">
+          <div class="stopwatch-face">
+            <span class="dial-index" aria-hidden="true"></span>
+            <p class="reading-label">Elapsed time</p>
+            <div class="time-value" data-testid="duration">{{ duration }}</div>
+            <p class="dial-note">{{ status() === 'finished' ? 'That time is yours.' : 'Every second counts.' }}</p>
+          </div>
+        </div>
+
+        <dl class="supporting-readings">
+          <div class="speed-reading">
+            <dt>{{ status() === 'finished' ? 'Average speed' : 'Current speed' }}</dt>
+            <dd>
+              <span class="speed-value" data-testid="speed">
+                @if (status() === 'finished') {
+                  {{ averageSpeed | number:'1.1-1' }}
+                } @else if (speed !== null && !speedIsStale) {
+                  {{ speed | number:'1.1-1' }}
+                } @else {
+                  <span class="no-speed" aria-label="No speed reading yet">···</span>
+                }
+              </span>
+              <span class="metric-unit">{{ speedUnit }}</span>
+            </dd>
+          </div>
+          <div>
+            <dt>Distance</dt>
+            <dd><span data-testid="distance">{{ distance | number:'1.2-2' }}</span><span class="metric-unit">{{ unit() }}</span></dd>
+          </div>
+        </dl>
+        <p class="reading-note">
+          @if (status() === 'finished') { Average speed includes time spent stopped. }
+          @else if (status() === 'tracking') { {{ speedIsStale ? 'Waiting for a fresh GPS reading.' : 'Speed and distance are estimated from GPS.' }} }
+          @else { Start a trip to record your speed and distance. }
+        </p>
+
+        <div class="trip-controls">
+          @if (status() === 'locating') {
+            <ion-button class="primary-action" expand="block" [disabled]="true"><ion-spinner name="crescent" aria-hidden="true" />Finding GPS…</ion-button>
+            <button type="button" class="text-button" (click)="cancelStart()">Cancel</button>
+          } @else if (status() === 'tracking') {
+            <ion-button class="primary-action" expand="block" (click)="finishTrip()"><span class="stop-mark" aria-hidden="true"></span>Finish trip</ion-button>
+          } @else {
+            <ion-button class="primary-action" expand="block" (click)="startTrip()"><span class="start-mark" aria-hidden="true"></span>{{ status() === 'finished' ? 'Start another trip' : 'Start trip' }}</ion-button>
+          }
+          <p class="control-note">{{ status() === 'finished' ? 'Starting again clears this trip. Nothing is saved after reloading.' : 'Keep this app open and your screen awake.' }}</p>
+        </div>
+
+        @if (error()) {
+          <div class="notice error-notice" role="alert"><p>{{ error() }}</p></div>
+        }
+        @if (gpsMessage()) {
+          <div class="notice" role="status"><p>{{ gpsMessage() }}</p></div>
+        }
+      </section>
+
+      <section class="location-log" aria-labelledby="location-heading">
+        <div class="log-heading"><h2 id="location-heading">Your ground covered.</h2><span>Trip log</span></div>
+        <div class="journey">
+          <article class="location-entry start-entry">
+            <span class="location-mark" aria-hidden="true"></span>
+            <h3>Starting point</h3>
+            @if (startPoint(); as point) {
+              <p class="coordinates" data-testid="start-location">{{ point.latitude | number:'1.5-5' }}, {{ point.longitude | number:'1.5-5' }}</p>
+              <p class="location-detail">Started at {{ startedAt() | date:'h:mm:ss a' }}</p>
+            } @else {
+              <p class="location-empty">Start here.</p>
+              <p class="location-detail">Your first GPS fix when you start.</p>
+            }
+          </article>
+          <article class="location-entry end-entry">
+            <span class="location-mark" aria-hidden="true"></span>
+            <h3>{{ status() === 'tracking' ? 'Latest location' : 'Finishing point' }}</h3>
+            @if (latestPoint(); as point) {
+              <p class="coordinates" data-testid="end-location">{{ point.latitude | number:'1.5-5' }}, {{ point.longitude | number:'1.5-5' }}</p>
+              <p class="location-detail">
+                {{ status() === 'finished' ? 'Last GPS fix at ' : 'Updated at ' }}{{ point.timestamp | date:'h:mm:ss a' }}
+              </p>
+              @if (status() === 'finished') {
+                <p class="location-detail">Finished at {{ finishedAt() | date:'h:mm:ss a' }}</p>
+              }
+            } @else {
+              <p class="location-empty">Finish strong.</p>
+              <p class="location-detail">Your last GPS location when you finish.</p>
+            }
+          </article>
+        </div>
+
+        <div class="gps-detail">
+          <span>GPS precision</span>
+          @if (latestPoint(); as point) {
+            <strong>Within {{ point.accuracy | number:'1.0-0' }} m</strong>
+          } @else {
+            <strong>Waiting for a trip</strong>
+          }
+        </div>
+        <p class="log-note">Your start and finish, recorded in coordinates. Distance follows your GPS readings along the way.</p>
+      </section>
+    </div>
+
+    <footer class="page-footer">
+      <span>Made for the miles ahead.</span>
+      <span>Foreground GPS · No account needed</span>
+    </footer>
+  </main>
+</ion-content>

@@ -1,0 +1,35 @@
+@import '@ionic/angular/css/core.css';
+@import '@ionic/angular/css/normalize.css';
+@import '@ionic/angular/css/structure.css';
+@import '@ionic/angular/css/typography.css';
+
+:root {
+  color-scheme: dark;
+  --page-background: #121413;
+  --surface: #1a1d1b;
+  --ink: #f5f5ef;
+  --muted: #b3b9b2;
+  --line: #3b423c;
+  --wash: #242925;
+  --accent: #ff8057;
+  --accent-ink: #181a17;
+  --ion-font-family: 'Segoe UI', 'Helvetica Neue', sans-serif;
+  --ion-background-color: var(--page-background);
+  --ion-text-color: var(--ink);
+  --ion-color-primary: #ff8057;
+  --ion-color-primary-rgb: 255, 128, 87;
+  --ion-color-primary-contrast: #181a17;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; }
+button, a { -webkit-tap-highlight-color: transparent; }
+button { font: inherit; }
+button:focus-visible, a:focus-visible, summary:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 4px;
+}
+ion-button::part(native):focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 4px;
+}

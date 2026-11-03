@@ -1,0 +1,37 @@
+{
+  "name": "field-tracker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": "^22.22.3 || ^24.15.0 || >=26.0.0" },
+  "scripts": {
+    "start": "ng serve --host 127.0.0.1",
+    "build": "ng build",
+    "test": "node --test tests/tracking.test.ts",
+    "test:ui": "playwright test",
+    "android:sync": "npm run build && cap sync android",
+    "android:open": "cap open android"
+  },
+  "dependencies": {
+    "@angular/common": "22.2.4",
+    "@angular/compiler": "22.2.4",
+    "@angular/core": "22.2.4",
+    "@angular/forms": "22.2.4",
+    "@angular/platform-browser": "22.2.4",
+    "@angular/router": "22.2.4",
+    "@capacitor/android": "8.6.0",
+    "@capacitor/core": "8.6.0",
+    "@capacitor/geolocation": "8.2.4",
+    "@ionic/angular": "9.0.10",
+    "ionicons": "^8.0.13",
+    "rxjs": "~7.8.2"
+  },
+  "devDependencies": {
+    "@angular/build": "22.2.4",
+    "@angular/cli": "22.2.4",
+    "@angular/compiler-cli": "22.2.4",
+    "@capacitor/cli": "8.6.0",
+    "@playwright/test": "^1.56.1",
+    "typescript": "~6.0.2"
+  }
+}

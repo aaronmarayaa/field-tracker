@@ -1,0 +1,5 @@
+{
+  "name": "Field Tracker",
+  "integrations": { "capacitor": {} },
+  "type": "angular-standalone"
+}
