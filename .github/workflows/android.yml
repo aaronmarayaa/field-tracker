@@ -56,3 +56,98 @@ jobs:
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
+          overwrite: true
+
+  publish:
+    name: Publish APK and install QR code
+    needs: build
+    if: >-
+      github.event_name != 'pull_request' &&
+      (github.event_name == 'workflow_dispatch' ||
+       github.ref_name == github.event.repository.default_branch)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      GH_REPO: ${{ github.repository }}
+      RELEASE_TAG: android-${{ github.run_id }}-${{ github.run_attempt }}
+
+    steps:
+      - name: Download the built APK
+        uses: actions/download-artifact@v8
+        with:
+          name: field-tracker-debug-apk
+          path: install
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+
+      - name: Install QR code generator
+        run: python -m pip install 'qrcode[pil]==8.2'
+
+      - name: Prepare the direct download link
+        run: |
+          mv install/app-debug.apk install/field-tracker.apk
+          release_base="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/download/${RELEASE_TAG}"
+          echo "APK_URL=${release_base}/field-tracker.apk" >> "$GITHUB_ENV"
+          echo "QR_URL=${release_base}/install-qr.png" >> "$GITHUB_ENV"
+          printf '%s\n' "${release_base}/field-tracker.apk" > install/download-url.txt
+
+      - name: Generate install QR code
+        run: |
+          python - <<'PY'
+          import os
+          import qrcode
+
+          image = qrcode.make(os.environ['APK_URL'])
+          image.save('install/install-qr.png')
+          PY
+
+      - name: Prepare download instructions
+        run: |
+          cat > install/release-notes.md <<EOF
+          ## Install Field Tracker
+
+          [Download the Android APK](${APK_URL})
+
+          Scan this QR code with your Android phone to download the APK:
+
+          ![Download Field Tracker](${QR_URL})
+
+          [Download the QR image](${QR_URL})
+
+          This is a debug build for testing. Open the downloaded APK to install it.
+          Private repositories require GitHub sign-in on the phone.
+          EOF
+
+      - name: Upload APK and QR code as an artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: field-tracker-install
+          path: |
+            install/field-tracker.apk
+            install/install-qr.png
+            install/download-url.txt
+          if-no-files-found: error
+          retention-days: 14
+          overwrite: true
+
+      - name: Publish the download release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$RELEASE_TAG" \
+            install/field-tracker.apk \
+            install/install-qr.png \
+            install/download-url.txt \
+            --target "$GITHUB_SHA" \
+            --title "Android build ${GITHUB_RUN_NUMBER} (${GITHUB_RUN_ATTEMPT})" \
+            --notes-file install/release-notes.md \
+            --prerelease \
+            --latest=false
+
+      - name: Show the install QR code in the run summary
+        run: cat install/release-notes.md >> "$GITHUB_STEP_SUMMARY"

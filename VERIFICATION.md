@@ -5,7 +5,9 @@ Checked on November 3, 2026 (Asia/Manila). This report covers the web implementa
 ## Recorded checks
 
 - PASS: `.github/workflows/android.yml` passed `actionlint` 1.7.12 with no workflow syntax or configuration errors. ShellCheck was disabled because the validator was run on Windows.
-- Android workflow execution is pending: the new GitHub Actions job builds and uploads a debug APK on pushes, pull requests, or manual dispatch; it has not been run on GitHub from this workspace.
+- PASS: the workflow's exact QR-generation Python produced a 490 x 490 PNG in a temporary validation directory. ZXing decoded it to the exact test APK URL. The test URL does not host an app and no sample QR was added to the product.
+- PASS: Git Bash parsed all 10 workflow shell steps without syntax errors, including the Python and Markdown heredocs. Build permissions remain read-only; release write access is limited to the publish job.
+- Android workflow execution is pending: builds produce the debug APK artifact; default-branch pushes and manual runs additionally publish the APK, direct download link, and install QR code in a GitHub prerelease and Actions run summary. Pull requests do not publish. This updated workflow has not been run on GitHub from this workspace.
 - PASS: Ionic CLI compatibility fix: renamed the Angular project from `field-tracker` to `app` and updated both serve build targets to match Ionic's default `app:serve` and `app:build` commands.
 - PASS: `ionic serve --no-open --no-interactive` built and started at `http://localhost:8100`; Chromium rendered the Start trip button with no uncaught page errors. The verification server was stopped afterward.
 - PASS: `ionic build --no-interactive` completed successfully after the target correction.

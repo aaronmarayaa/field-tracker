@@ -85,7 +85,23 @@ The job installs Node.js 24, Java 21, and the Android SDK, runs the calculation 
 
 After a successful run, open the run's **Artifacts** section, download `field-tracker-debug-apk`, extract it, and transfer the APK to your phone. This debug build uses Android's debug signing and needs no signing secrets. A Play Store release build is a separate setup.
 
-The workflow has been checked locally, but its first full APK build still needs to run on GitHub Actions.
+### Download with a QR code
+
+After a successful push to the repository's default branch, or a manual **Run workflow**, a second job publishes a GitHub prerelease with:
+
+- `field-tracker.apk`: the installable Android app.
+- `install-qr.png`: a QR code pointing directly to that build's APK download.
+- `download-url.txt`: the same link as plain text.
+
+Open **Actions > Android APK > the successful run > Summary** to see the QR code, or open the repository's **Releases** page. Scan the code with your Android phone, download the APK, and open it to install. Android may ask you to allow installation from your browser.
+
+The workflow also uploads a `field-tracker-install` artifact containing the APK, QR image, and link. Each published build gets its own release tag so an existing QR keeps pointing to the same APK. Release downloads last until that release is deleted; Actions artifacts are retained for 14 days.
+
+Public repositories allow the QR download without a GitHub login. Private repositories require an authorized GitHub sign-in on the phone. Pull requests and pushes to other branches produce the original APK artifact without publishing a release or QR code.
+
+If an older debug installation rejects an update because the build's signing key differs, uninstall that debug app before installing the new APK.
+
+The workflow and QR generation have been checked locally. A working app download QR is produced after the first successful GitHub build and release publication; a local example URL does not host an APK.
 
 ## Checks
 
