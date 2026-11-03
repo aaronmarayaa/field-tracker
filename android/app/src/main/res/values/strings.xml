@@ -4,4 +4,7 @@
     <string name="title_activity_main">Field Tracker</string>
     <string name="package_name">com.example.fieldtracker</string>
     <string name="custom_url_scheme">com.example.fieldtracker</string>
+    <string name="capacitor_background_geolocation_notification_channel_name">Trip recording</string>
+    <string name="capacitor_background_geolocation_notification_icon">drawable/ic_tracking</string>
+    <string name="capacitor_background_geolocation_notification_color">#ff8057</string>
 </resources>

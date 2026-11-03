@@ -25,10 +25,15 @@ Browser location needs HTTPS or localhost. Opening an HTTP address from another 
 - Starting coordinates and time.
 - Latest coordinates during tracking, or the last accepted coordinates when finished.
 - Finish time and average speed for the whole trip.
+- A map with a starting marker, moving location marker, and recorded route line.
 
-**Finish is manual.** There is no destination search or automatic arrival detection. Coordinates are latitude and longitude; no address lookup or map service is used.
+**Finish is manual.** There is no destination search or automatic arrival detection. Coordinates are latitude and longitude. Leaflet displays the street map using OpenStreetMap tiles; there is no address lookup.
 
-Keep the app visible and the screen awake. Hiding it or locking the screen ends this foreground-only trip when the visibility event is received. This app does not prevent sleep or guarantee tracking in the background.
+On **Android**, start the trip while the app is visible and allow precise location and notification permissions. A persistent **Field Tracker is recording** notification accompanies the location service. You can lock the screen or switch apps during the trip. Tap the notification to return, then tap **Finish trip** to stop the service.
+
+In a **browser**, keep the app visible and the screen awake. Browser tracking still ends when the page becomes hidden.
+
+A fully powered-off phone cannot record GPS. Force-stopping the app or Android terminating its process also ends this in-memory session. Some phones' battery restrictions can interrupt services; if that happens, allow unrestricted battery use for Field Tracker in Android settings.
 
 Trip data stays in memory. Starting another trip clears it; reloading or closing the app loses it. There is no account, database, or trip history.
 
@@ -39,6 +44,9 @@ Trip data stays in memory. Starting another trip clears it; reloading or closing
 | `src/app/home/home.page.html` | The screen: readings, controls, and location log. |
 | `src/app/home/home.page.ts` | `startTrip()`, `recordPosition()`, and `finishTrip()`. |
 | `src/app/home/tracking.ts` | Distance, unit conversions, and time formatting. |
+| `src/app/home/location-watch.ts` | Chooses the Android background watcher or the browser watcher, and stops the correct one. |
+| `src/app/tracking-map/tracking-map.component.ts` | Creates the map, draws accepted GPS points, and cleans up its map instance. |
+| `src/app/tracking-map/tracking-map.component.html` | Map states, legend, and Center on me control. |
 | `src/app/home/home.page.scss` | Mobile-first layout, with medium and wide states. |
 | `src/global.scss` | Shared colors, type, and keyboard focus. |
 | `src/assets/sports/` | Your three running photographs, bundled for offline native use. |
@@ -48,7 +56,19 @@ Angular **signals** are values that update the screen when they change. `unit()`
 
 The big stopwatch shows hours, minutes, and seconds. Its orange ring sweeps once per minute using the elapsed seconds. The HTML passes an angle to the CSS through `--elapsed-angle`; no separate animation timer is needed. On Finish, both the digits and the ring freeze.
 
-`Geolocation.getCurrentPosition()` finds the start. `Geolocation.watchPosition()` sends later readings. `Geolocation.clearWatch()` releases that watcher on Finish. The watcher ID is retained so it can be stopped. A session number lets the page ignore late location responses after Cancel or Finish.
+`Geolocation.getCurrentPosition()` finds the start. The `location-watch.ts` helper selects the watcher: browsers use `Geolocation.watchPosition()`; Android uses `BackgroundGeolocation.addWatcher()` with a persistent notification. Finish removes that same watcher. A session number lets the page ignore late responses after Cancel or Finish.
+
+The Android helper converts native fixes into the same position format used by the existing calculations. Capacitor's `android.useLegacyBridge` is enabled because the [background-location plugin](https://github.com/capacitor-community/background-geolocation) requires it for continued background delivery.
+
+### How the map works
+
+The parent page passes the start, latest location, accepted route points, and trip state to a small standalone map component through `@Input()` properties. The map does not request location or start a second GPS watcher.
+
+`routePoints` keeps the accepted fixes in memory, including updates received while the screen is locked. When Angular next redraws the map, it adds every pending point. The white marker identifies the start; the orange marker identifies the current location or finish. The route is frozen on Finish and cleared when a new trip begins.
+
+Dragging the map pauses automatic centering. **Center on me** resumes following. Use the zoom buttons or pinch to inspect the route. Map tiles need internet, but a tile-loading failure does not stop GPS calculations or route recording; **Reload map** retries the street background.
+
+Leaflet is bundled with the app; the street tiles are loaded from OpenStreetMap with visible attribution. This uses the standard [OpenStreetMap tile service](https://operations.osmfoundation.org/policies/tiles/), with normal browser caching and no bulk or offline downloads. The Android WebView identifies itself as Field Tracker through its appended user agent.
 
 All distance is kept in **meters**, all speed in **meters per second**. Unit buttons change only the display. `distanceBetween()` uses the Haversine formula to calculate the distance along the earth between two coordinates. The page adds traveled segments rather than measuring a straight line from start to finish.
 
@@ -56,7 +76,7 @@ GPS measurements are estimates. This version ignores readings with accuracy wors
 
 ## Run on Android
 
-The native `android/` project is already included, with foreground coarse/fine location permissions. Its package ID is the development placeholder `com.example.fieldtracker`, and it retains the default Capacitor launcher icon as a placeholder.
+The native `android/` project is already included, with precise/coarse location, location foreground-service, and notification permissions. Its package ID is the development placeholder `com.example.fieldtracker`, and it retains the default Capacitor launcher icon as a placeholder. The recording notification uses a separate location status icon.
 
 1. Install Android Studio with Android SDK 36 and a Java 21 JDK. Android Studio can provide the JDK.
 2. Build and copy the web app into the Android project:
@@ -66,12 +86,14 @@ The native `android/` project is already included, with foreground coarse/fine l
    npm run android:open
    ```
 
-3. In Android Studio, choose your connected phone or emulator and run the app. Enable phone location and allow **precise** location when prompted.
+3. In Android Studio, choose your connected phone or emulator and run the app. Enable phone location and allow **precise** location and **notifications** when prompted.
 4. Test outside on a real phone. An emulator needs simulated location movement.
 
 After changing the Angular app, run `npm run android:sync` again before running Android. No live-reload server URL is embedded in the native app.
 
-The production web build and Capacitor Android sync were verified here. No Android SDK was available on this machine, so an APK build and real-phone GPS tracking have not been verified.
+The production web build, browser/native-bridge simulations, and Capacitor Android sync are checked locally. No Android SDK or connected phone was available here, so native APK compilation and real screen-lock behavior still need device verification. Build and reinstall the APK after these plugin/configuration changes; restarting the browser preview alone cannot add Android background tracking.
+
+For a phone check, start a trip outdoors, confirm the persistent recording notification, lock the screen for at least six minutes while moving, and reopen the app. Check that the stopwatch, distance, and route include that period. Finish the trip and confirm that the recording notification disappears.
 
 iOS is not configured in this Windows project. Adding it later requires `@capacitor/ios`, a Mac with Xcode, and the location descriptions required by the [Geolocation plugin](https://capacitorjs.com/docs/apis/geolocation).
 
@@ -112,6 +134,6 @@ npx playwright install chromium
 npm run test:ui
 ```
 
-Calculation tests use Node's built-in test runner. Browser tests use controlled GPS fixtures to check movement, denied permission, weak signal, cancellation, foreground stopping, unit conversion, keyboard controls, and responsive widths. Test coordinates are fixtures, never preloaded into the app.
+Calculation tests use Node's built-in test runner. Browser tests cover the original controls plus map movement, route reset, unavailable tiles, recentering, zoom, and map failure isolation. Native-bridge fixtures verify Android hidden-state recording, batched route fixes, notification denial, and watcher cleanup. These simulations do not replace a real Android screen-lock test. Test coordinates and map tiles are fixtures, never preloaded into the app.
 
 Read `VERIFICATION.md` for the recorded checks and the antislop delivery gate.

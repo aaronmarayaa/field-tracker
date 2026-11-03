@@ -19,3 +19,8 @@ ENERGY 3 / RHYTHM 2 / MOTION 1.
 - Fixed dark mode follows the supplied dark sports photography and keeps the bright timer and readings prominent.
 - Motion is limited to input feedback, the functional loading spinner, and changes in real elapsed time.
 - A single screen supports Start, recording, Finish, and the completed trip without extra navigation or filler metrics.
+- The route map sits below the existing instrument and location log, keeping the stopwatch and recording action in their current positions.
+- Street tiles retain their original light colors for readable geographic labels; the surrounding map controls follow the sports interface.
+- The white start marker, orange position marker, and outlined route line distinguish location data without decorative motion.
+- An empty map waits for a real GPS fix, and a tile-loading failure leaves the trip readings available.
+- Android's recording notification uses a white location-status icon so the screen-off service stays visible and offers a way back to Finish.

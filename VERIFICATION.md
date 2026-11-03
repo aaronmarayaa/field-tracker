@@ -1,6 +1,6 @@
 # Verification
 
-Checked on November 3, 2026 (Asia/Manila). This report covers the web implementation and Android project preparation, not an APK build or physical GPS accuracy.
+Checked on November 3, 2026 (Asia/Manila). This report covers the web implementation, simulated Android bridge behavior, and Android project preparation, not an APK build or physical screen-lock/GPS accuracy.
 
 ## Recorded checks
 
@@ -13,12 +13,14 @@ Checked on November 3, 2026 (Asia/Manila). This report covers the web implementa
 - PASS: `ionic build --no-interactive` completed successfully after the target correction.
 - PASS: `npm run build` completed after the sports redesign with strict Angular template and TypeScript checking.
 - PASS: `npm test` completed with 6 passing calculation tests: Haversine distance, coordinate validity, drift/jump filtering, traveled segments, unit conversions, and durations.
-- PASS: `npm run test:ui` completed with 6 passing Chromium browser tests. GPS fixtures exist only in the tests.
-- PASS: `npx cap sync android` copied the production bundle and registered `@capacitor/geolocation@8.2.4`.
-- PASS: Android manifest contains coarse and fine foreground location permissions; GPS hardware is optional.
+- PASS: the original 6 browser tests passed before adding the map. The final suite passes all 13 tests: the original 6, four map checks, and three simulated Android background checks. GPS/Android-bridge fixtures exist only in test code.
+- PASS: `npx cap sync android` copied the production bundle and registered Geolocation 8.2.4, Background Geolocation 1.3.1, and Local Notifications 8.3.1. The native configuration contains `useLegacyBridge: true`.
+- PASS: Android manifest contains coarse/fine location, location foreground-service, and notification permissions. The location-service declaration is supplied by the background plugin; GPS hardware remains optional in the app manifest.
 - PASS: browser console inspection captured no console errors or uncaught page errors while opening the page, changing units, and scrolling.
 
 The sports redesign was checked at `http://127.0.0.1:8102` using `TRACKER_TEST_PORT=8102`; ordinary `npm run test:ui` uses 8100. The Ionic CLI compatibility checks above were completed before the visual redesign; the Angular `app` target is retained.
+
+The map and screen-off additions were checked at `http://127.0.0.1:8103` using `TRACKER_TEST_PORT=8103`. Git confirms that `src/app/home/tracking.ts`, the existing home stylesheet, and the Android APK/QR workflow have no changes in this work. Home-page additions connect the map, retain accepted route points, select the native watcher, and apply the requested Android visibility behavior. The distance, speed, duration, and unit calculations remain the same.
 
 ## Interactive controls, checked individually
 
@@ -32,11 +34,22 @@ The sports redesign was checked at `http://127.0.0.1:8102` using `TRACKER_TEST_P
 - PASS: location permission denial displays an actionable alert and leaves Start available.
 - PASS: weak GPS readings do not add distance; signal errors show feedback.
 - PASS: missing device speed falls back to successive positions; an implausible jump does not replace the endpoint; speed older than 15 seconds is hidden.
-- PASS: hiding the page ends foreground tracking and releases the watcher.
+- PASS: hiding the browser page ends foreground tracking and releases its watcher. Android bridge simulations retain their native watcher while hidden and remove it on Finish.
 - PASS: the final footer is reachable by scrolling on a 390 x 844 viewport.
 - PASS: the stopwatch seconds ring advances during recording and freezes on Finish, checked with the browser clock.
 - PASS: all three supplied running photos load successfully and remain visible on narrow screens.
 - PASS: the Start button fits within the initial 390 x 844 viewport, from y=781.5 to y=837.5.
+- PASS: map startup waits for a real accepted GPS fix; there is no invented location in the empty state.
+- PASS: accepted positions move the marker and extend the route; low-accuracy readings and implausible jumps do not change the displayed route.
+- PASS: Finish keeps the route visible and frozen; another trip clears the route and reuses one map instance.
+- PASS: map zoom-in and zoom-out controls were clicked; dragging pauses following and Center on me resumes it, including keyboard activation.
+- PASS: tile failure feedback is actionable; Reload map recovers after the simulated connection returns, while speed and distance keep updating.
+- PASS: a simulated map initialization failure leaves Start, speed, distance, units, and Finish functional with no uncaught page errors.
+- PASS: the map's OpenStreetMap attribution link was clicked and opened `https://www.openstreetmap.org/copyright` with the title `Copyright and License | OpenStreetMap`.
+- PASS: actual OpenStreetMap tiles returned HTTP 200 in a separate visual check; no page errors occurred. The pictured coordinates were a browser GPS fixture, not the user's actual location.
+- PASS: simulated Android permission-dialog visibility changes do not cancel Start; notification denial leaves Start available without starting a background watcher.
+- PASS: a simulated six-minute hidden Android session keeps recording. Three fixes delivered in one batch all appear in the route after resume, and Finish removes the native watcher.
+- PASS: two consecutive simulated Android trips create one watcher each and remove each watcher on Finish.
 
 ## Antislop core delivery gate
 
@@ -50,20 +63,20 @@ The sports redesign was checked at `http://127.0.0.1:8102` using `TRACKER_TEST_P
 - R-24 PASS: no navigation links or dead destinations exist.
 - R-25 PASS: measured contrast is 16.90:1 for main text on charcoal, 9.25:1 for muted text on charcoal, 8.50:1 for muted text on the dial, 7.40:1 for muted text on the unit-control wash, and 7.07:1 for text on the orange action button. Selected-unit colors were also inspected in the rendered browser.
 - R-26 PASS: every interactive element has its recorded behavior in the individual control list above.
-- R-27 PASS: ready and empty location states, locating and disabled loading button, and denied/weak/unavailable GPS feedback are implemented and exercised.
+- R-27 PASS: ready, locating, and denied/weak/unavailable GPS states were exercised. Map empty, tile loading, tile error/retry, and initialization-failure states were also exercised.
 - R-28 PASS: no generic FAQ exists.
 - R-32 PASS: keyboard control order and activation were exercised; authored CSS includes visible focus outlines for buttons and Ionic native button parts. There are no dialogs.
 - R-33 PASS: interface features were authored directly in source with patches; preview scripts only captured screenshots and measured the rendered UI.
 - R-34 PASS: one intentional dark theme follows the user's supplied sports photography; no incomplete theme toggle exists.
-- R-35 PASS: production build, six browser tests, individual control results, console inspection, and mobile/tablet/desktop screenshots are recorded here.
+- R-35 PASS: production build, thirteen browser tests, individual control results, console inspection, and map phone/desktop screenshots are recorded here. Native checks are explicitly simulations.
 - R-36 PASS: no invented security, customer, compliance, or performance claims exist.
 - R-37 PASS: `DESIGN.md` records the user's selected direction; the design read was declared before generating the interface.
-- R-38 PASS: product readings are real runtime values; unavailable speed and locations are explicitly empty. Browser fixtures are isolated to test code.
+- R-38 PASS: product readings are real runtime values; unavailable speed and locations are explicitly empty. Browser fixtures are isolated to test code, and simulated-map screenshots are labeled as such in this report.
 
 ### Purpose gate
 
 - R-01 PASS: charcoal and off-white follow the monochrome running photograph; orange connects to the track. The conic gradient represents actual elapsed seconds, with its purpose recorded in `DESIGN.md`. No ornamental glow is used.
-- R-04 PASS: play/stop marks represent recording actions and location markers represent endpoints, with reasons in `DESIGN.md`; there is no decorative icon set.
+- R-04 PASS: play/stop marks represent recording actions, map markers represent endpoints, and the Android notification icon identifies location recording, with reasons in `DESIGN.md`; there is no decorative icon set.
 - R-06 PASS: familiar sans-serif labels and tabular digits serve readability; condensed Impact headings follow sports signage. Reasons are documented.
 - R-07 PASS: the background is solid charcoal; no ornamental grid or dot pattern is used.
 - R-08 PASS: no decorative button arrows are used.
@@ -72,7 +85,7 @@ The sports redesign was checked at `http://127.0.0.1:8102` using `TRACKER_TEST_P
 - R-12 PASS: open sections sit on the page without floating card shadows; the Ionic button shadow is disabled.
 - R-13 PASS: no glow is used.
 - R-14 PASS: readings and locations follow their content hierarchy without repeated feature cards.
-- R-19 PASS: motion is limited to control feedback, the functional locating spinner, and real elapsed-time updates; no looping decorative animation is used.
+- R-19 PASS: motion follows control feedback, the locating spinner, real time, and accepted GPS position updates. Map updates avoid decorative zoom/fade animations.
 - R-22 PASS: the three images are the user's supplied running photos, copied into the app and inspected in the browser; no invented or external stock illustration is used.
 
 ### Liveliness
@@ -117,7 +130,7 @@ The sports redesign was checked at `http://127.0.0.1:8102` using `TRACKER_TEST_P
 
 ## Code comment supplement
 
-- PASS: four authored source comments explain the distance formula, GPS filtering, web permission behavior, and the asynchronous watcher-ID race.
+- PASS: original comments explain the formula, GPS filtering, web permission behavior, and watcher-ID race. Three new single-line comments explain map reset identity, native position normalization, and the required Android bridge setting.
 - PASS: there are no authored decorative separators, shouty banners, redundant descriptions, workflow narration, vague TODOs, emoji, or end markers.
 - PASS: comments are sparse, single-line notes in natural sentence case.
 - PASS: the hygiene review introduced no executable-code changes; the application's implementation was performed under the separate user request to build it. Generated native build notices and licensing comments were preserved.
@@ -128,7 +141,10 @@ The sports redesign was checked at `http://127.0.0.1:8102` using `TRACKER_TEST_P
 - `screenshots/sports-mobile-full.png`: full scrolling phone content at 390 px width.
 - `screenshots/sports-tablet.png`: 768 px intermediate layout.
 - `screenshots/sports-desktop.png`: 1440 px wide layout.
+- `screenshots/map-ready-mobile.png`: the initial phone screen, with the existing primary controls in place.
+- `screenshots/map-simulated-mobile.png`: phone map, real OpenStreetMap tiles and simulated GPS coordinates.
+- `screenshots/map-simulated-desktop.png`: wide map, real tiles and simulated GPS coordinates.
 
 ## Practical limits
 
-Android SDK 36 was not installed here. An Android APK build, native permission prompts, physical battery behavior, GPS accuracy, and real-device screen-lock lifecycle behavior remain unverified. Test those on a phone before relying on the tracker. The app is deliberately foreground-only, stores no trip history, and uses manual Finish with coordinates rather than automatic arrival or address lookup.
+Android SDK 36 and a connected Android phone were not available here. Native APK compilation, actual permission prompts, physical battery behavior, GPS accuracy, and real screen-lock behavior remain unverified. Android now uses a location foreground service with a persistent notification; a browser still needs to stay visible. Device verification should include a moving trip with the screen locked for at least six minutes, followed by Finish and confirmation that the notification disappears. A fully powered-off or force-stopped phone/app cannot keep this in-memory session recording. The app stores no trip history and uses manual Finish rather than automatic arrival or address lookup.

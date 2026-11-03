@@ -1,0 +1,39 @@
+app-tracking-map { display: block; }
+app-tracking-map .tracking-map { border-top: 1px solid var(--line); margin-top: 32px; padding-top: 24px; }
+app-tracking-map .map-heading { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px; margin-bottom: 18px; }
+app-tracking-map h2 { margin: 0; font: 400 1.8rem/1 Impact, 'Arial Narrow', sans-serif; text-transform: uppercase; }
+app-tracking-map .map-heading p { color: var(--muted); font-size: 0.75rem; margin: 8px 0 0; }
+app-tracking-map button { min-width: 44px; min-height: 44px; padding: 10px 14px; background: var(--wash); color: var(--ink); border: 1px solid var(--muted); border-radius: 4px; cursor: pointer; font-size: 0.78rem; }
+app-tracking-map button:disabled { opacity: 0.5; cursor: default; }
+app-tracking-map button:not(:disabled):active { background: var(--line); }
+app-tracking-map .map-frame { position: relative; min-width: 0; }
+app-tracking-map .route-map { height: 280px; width: 100%; background: var(--surface); }
+app-tracking-map .map-empty { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 28px; text-align: center; background: var(--surface); }
+app-tracking-map .map-empty strong { font-size: 1.05rem; }
+app-tracking-map .map-empty p { max-width: 36ch; color: var(--muted); font-size: 0.8rem; line-height: 1.7; margin: 0; }
+app-tracking-map .map-caption { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-top: 17px; }
+app-tracking-map .map-legend { display: flex; gap: 16px; flex-wrap: wrap; color: var(--muted); font-size: 0.72rem; }
+app-tracking-map .map-legend > span { display: inline-flex; align-items: center; gap: 7px; }
+app-tracking-map .map-key { width: 10px; height: 10px; border: 1px solid var(--ink); border-radius: 50%; }
+app-tracking-map .map-key-start { background: var(--ink); }
+app-tracking-map .map-key-location { background: var(--accent); border-color: var(--accent); }
+app-tracking-map .map-key-route { width: 16px; border-top: 3px solid var(--accent); }
+app-tracking-map .map-coordinate { margin: 0; color: var(--muted); font-size: 0.75rem; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+app-tracking-map .map-feedback { min-height: 30px; display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 12px; }
+app-tracking-map .map-feedback p { margin: 0; color: var(--muted); font-size: 0.72rem; line-height: 1.7; }
+app-tracking-map .tracking-map .leaflet-control-zoom a { width: 44px; height: 44px; line-height: 44px; color: #121413; background: #ffffff; }
+app-tracking-map .leaflet-control-zoom a:focus-visible { outline: 3px solid #ba3d1e; outline-offset: -3px; }
+app-tracking-map .leaflet-control-attribution { max-width: 100%; background: #ffffff; color: #121413; font-size: 0.65rem; padding: 0 8px; }
+app-tracking-map .leaflet-control-attribution a { display: inline-flex; align-items: center; min-height: 44px; color: #075b91; }
+app-tracking-map .leaflet-control-attribution a:focus-visible { outline: 2px solid #ba3d1e; outline-offset: -2px; }
+app-tracking-map .leaflet-container { color-scheme: light; }
+
+@media (min-width: 680px) {
+  app-tracking-map .tracking-map { margin-top: 36px; padding-top: 28px; }
+  app-tracking-map .route-map { height: 360px; }
+  app-tracking-map h2 { font-size: 2rem; }
+}
+
+@media (min-width: 1120px) {
+  app-tracking-map .route-map { height: 420px; }
+}

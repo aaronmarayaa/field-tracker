@@ -1,0 +1,48 @@
+<section class="tracking-map" aria-labelledby="route-heading">
+  <div class="map-heading">
+    <div>
+      <h2 id="route-heading">Your route.</h2>
+      <p>Your GPS readings, one point at a time.</p>
+    </div>
+    <button type="button" class="map-center-button" [disabled]="!latestPoint || unavailable()" (click)="centerOnMe()">Center on me</button>
+  </div>
+
+  <div class="map-frame">
+    <div #mapContainer class="route-map" role="region" aria-label="Trip route map"></div>
+    @if (!startPoint || unavailable()) {
+      <div class="map-empty">
+        @if (unavailable()) {
+          <strong>The map could not open.</strong>
+          <p>Your trip readings remain available above. A new trip will try the map again.</p>
+        } @else {
+          <strong>{{ locating ? 'Waiting for your GPS fix…' : 'Your next route starts here.' }}</strong>
+          <p>Start a trip to see your location and the path you travel.</p>
+        }
+      </div>
+    }
+  </div>
+
+  <div class="map-caption">
+    <div class="map-legend" aria-label="Map legend">
+      <span><span class="map-key map-key-start" aria-hidden="true"></span>Start</span>
+      <span><span class="map-key map-key-location" aria-hidden="true"></span>{{ finished ? 'Finish' : 'Current location' }}</span>
+      <span><span class="map-key-route" aria-hidden="true"></span>Route</span>
+    </div>
+    @if (latestPoint) {
+      <p class="map-coordinate">{{ latestPoint.latitude | number:'1.5-5' }}, {{ latestPoint.longitude | number:'1.5-5' }}</p>
+    }
+  </div>
+
+  <div class="map-feedback" role="status">
+    @if (tileError()) {
+      <p>Map tiles are unavailable. Check your connection; your location and route can still update.</p>
+      <button type="button" class="map-retry-button" (click)="reloadTiles()">Reload map</button>
+    } @else if (loading()) {
+      <p>Loading the street map…</p>
+    } @else if (latestPoint && !unavailable()) {
+      <p>{{ finished ? 'Your recorded route. Pinch or use the buttons to zoom.' : following() ? 'Following your GPS location. Drag the map to look around.' : 'Map moved. Tap Center on me to follow your location again.' }}</p>
+    } @else {
+      <p>Street maps need an internet connection.</p>
+    }
+  </div>
+</section>

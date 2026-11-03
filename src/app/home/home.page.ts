@@ -3,6 +3,8 @@ import { DecimalPipe, DatePipe } from '@angular/common';
 import { IonButton, IonContent, IonSpinner } from '@ionic/angular';
 import { Capacitor } from '@capacitor/core';
 import { Geolocation, type Position, type PositionOptions } from '@capacitor/geolocation';
+import { TrackingMapComponent } from '../tracking-map/tracking-map.component';
+import { prepareBackgroundTracking, startLocationWatch, stopLocationWatch, supportsBackgroundTracking } from './location-watch';
 import {
   displayDistance, displaySpeed, distanceBetween, formatDuration, isUsablePoint, movementBetween,
   type DistanceUnit, type TrackPoint,
@@ -11,15 +13,17 @@ import {
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [IonButton, IonContent, IonSpinner, DecimalPipe, DatePipe],
+  imports: [IonButton, IonContent, IonSpinner, DecimalPipe, DatePipe, TrackingMapComponent],
   templateUrl: './home.page.html',
   styleUrl: './home.page.scss',
 })
 export class HomePage implements OnDestroy {
+  readonly canTrackInBackground = supportsBackgroundTracking();
   readonly status = signal<'ready' | 'locating' | 'tracking' | 'finished'>('ready');
   readonly unit = signal<DistanceUnit>('km');
   readonly startPoint = signal<TrackPoint | null>(null);
   readonly latestPoint = signal<TrackPoint | null>(null);
+  readonly routePoints = signal<TrackPoint[]>([]);
   readonly distanceMeters = signal(0);
   readonly speedMetersPerSecond = signal<number | null>(null);
   readonly startedAt = signal<number | null>(null);
@@ -95,8 +99,12 @@ export class HomePage implements OnDestroy {
         }
       }
 
+      await prepareBackgroundTracking();
       const position = await Geolocation.getCurrentPosition(this.locationOptions);
       if (session !== this.session) return;
+      if (this.canTrackInBackground && document.hidden) {
+        throw new Error('Keep Field Tracker open until the trip starts, then lock your screen.');
+      }
 
       const point = this.toTrackPoint(position);
       if (!isUsablePoint(point)) {
@@ -105,13 +113,14 @@ export class HomePage implements OnDestroy {
 
       this.startPoint.set(point);
       this.latestPoint.set(point);
+      this.routePoints.set([point]);
       this.distanceAnchor = point;
       this.startedAt.set(Date.now());
       this.now.set(Date.now());
       this.status.set('tracking');
       this.timerId = setInterval(() => this.now.set(Date.now()), 1000);
 
-      const watchId = await Geolocation.watchPosition(this.locationOptions, (nextPosition, locationError) => {
+      const watchId = await startLocationWatch(this.locationOptions, (nextPosition, locationError) => {
         if (session !== this.session || this.status() !== 'tracking') return;
         if (locationError) {
           this.speedMetersPerSecond.set(null);
@@ -123,7 +132,7 @@ export class HomePage implements OnDestroy {
 
       // Finish or Cancel may run before the native watcher returns its ID.
       if (session !== this.session) {
-        await Geolocation.clearWatch({ id: watchId });
+        await stopLocationWatch(watchId);
       } else {
         this.watchId = watchId;
       }
@@ -153,6 +162,10 @@ export class HomePage implements OnDestroy {
 
   @HostListener('document:visibilitychange')
   onVisibilityChange(): void {
+    if (this.canTrackInBackground) {
+      if (!document.hidden && this.status() === 'tracking') this.now.set(Date.now());
+      return;
+    }
     if (document.hidden && this.status() === 'tracking') {
       void this.finishTrip();
       this.error.set('This trip ended when the app was hidden. Keep it open for foreground tracking.');
@@ -197,6 +210,7 @@ export class HomePage implements OnDestroy {
         ? deviceSpeed : estimatedSpeed,
     );
     this.latestPoint.set(point);
+    this.routePoints.update((points) => [...points, point]);
     this.gpsMessage.set('');
     this.now.set(Date.now());
   }
@@ -214,6 +228,7 @@ export class HomePage implements OnDestroy {
   private resetReadings(): void {
     this.startPoint.set(null);
     this.latestPoint.set(null);
+    this.routePoints.set([]);
     this.distanceMeters.set(0);
     this.speedMetersPerSecond.set(null);
     this.startedAt.set(null);
@@ -233,7 +248,7 @@ export class HomePage implements OnDestroy {
     this.watchId = null;
     if (id === null) return;
     try {
-      await Geolocation.clearWatch({ id });
+      await stopLocationWatch(id);
     } catch {
       this.error.set('The trip ended, but GPS could not be released. Close the app to stop location use.');
     }

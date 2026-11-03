@@ -1,5 +1,12 @@
 import { expect, test, type Page } from '@playwright/test';
 
+const tileUrl = 'https://tile.openstreetmap.org/**';
+const tileFixture = '<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><rect width="256" height="256" fill="#e8ebdf"/><text x="16" y="128" fill="#46513f" font-size="14">Map tile fixture</text></svg>';
+
+test.beforeEach(async ({ page }) => {
+  await page.route(tileUrl, (route) => route.fulfill({ contentType: 'image/svg+xml', body: tileFixture }));
+});
+
 async function fakeGps(page: Page): Promise<void> {
   await page.addInitScript(() => {
     let callback: PositionCallback | null = null;
@@ -192,4 +199,135 @@ test('phone, tablet, and desktop reflow without overflow; all controls support k
   await page.keyboard.press('Enter');
   await expect(page.getByText('Recording your trip')).toBeVisible();
   await page.getByRole('button', { name: 'Finish trip', exact: true }).click();
+});
+
+test('map waits for GPS, draws accepted movement, freezes on Finish, and resets for a new trip', async ({ page }) => {
+  await fakeGps(page);
+  await page.goto('/');
+  await expect(page.getByText('Your next route starts here.')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Center on me' })).toBeDisabled();
+  await expect(page.locator('.leaflet-container')).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Start trip', exact: true }).click();
+  await expect(page.locator('.route-start-marker')).toBeAttached();
+  await expect(page.locator('.route-location-marker')).toBeAttached();
+  await expect(page.locator('.map-coordinate')).toHaveText('14.59950, 120.98420');
+  await expect.poll(() => gpsAction(page, 'watching')).toBe(true);
+
+  const timestamp = Date.now() + 10000;
+  await gpsAction(page, 'emit', [14.6005, 120.9842, 3, 5, timestamp]);
+  await expect(page.locator('.map-coordinate')).toHaveText('14.60050, 120.98420');
+  await expect(page.locator('.route-line')).toHaveAttribute('d', /L/);
+  const routeBeforeInvalidReadings = await page.locator('.route-line').getAttribute('d');
+
+  await gpsAction(page, 'emit', [14.7, 120.9842, 3, 100, timestamp + 1000]);
+  await expect(page.getByText('Weak GPS signal.', { exact: false })).toBeVisible();
+  await expect(page.locator('.map-coordinate')).toHaveText('14.60050, 120.98420');
+  await expect(page.locator('.route-line')).toHaveAttribute('d', routeBeforeInvalidReadings!);
+
+  await gpsAction(page, 'emit', [16, 120.9842, 3, 5, timestamp + 2000]);
+  await expect(page.getByText('GPS jumped unexpectedly.', { exact: false })).toBeVisible();
+  await expect(page.locator('.map-coordinate')).toHaveText('14.60050, 120.98420');
+
+  await page.getByRole('button', { name: 'Finish trip', exact: true }).click();
+  await expect(page.locator('.map-legend')).toContainText('Finish');
+  const finishedRoute = await page.locator('.route-line').getAttribute('d');
+  await gpsAction(page, 'emit', [14.6015, 120.9842, 3, 5, timestamp + 10000]);
+  await expect(page.locator('.route-line')).toHaveAttribute('d', finishedRoute!);
+  await expect(page.locator('.map-coordinate')).toHaveText('14.60050, 120.98420');
+  expect(await gpsAction(page, 'watching')).toBe(false);
+
+  await page.getByRole('button', { name: 'Start another trip', exact: true }).click();
+  await expect(page.locator('.leaflet-container')).toHaveCount(1);
+  await expect(page.locator('.map-coordinate')).toHaveText('14.59950, 120.98420');
+  await expect(page.locator('.route-line')).not.toHaveAttribute('d', /L/);
+  await expect(page.getByTestId('distance')).toHaveText('0.00');
+  await page.getByRole('button', { name: 'Finish trip', exact: true }).click();
+});
+
+test('map tile failures do not stop GPS tracking and Reload map recovers', async ({ page }) => {
+  await fakeGps(page);
+  const failTiles = (route: import('@playwright/test').Route) => route.abort();
+  await page.route(tileUrl, failTiles);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Start trip', exact: true }).click();
+  await expect(page.getByText('Map tiles are unavailable.', { exact: false })).toBeVisible();
+  await expect.poll(() => gpsAction(page, 'watching')).toBe(true);
+  await gpsAction(page, 'emit', [14.6005, 120.9842, 3, 5, Date.now() + 10000]);
+  await expect(page.getByTestId('distance')).toHaveText('0.11');
+  await expect(page.getByTestId('speed')).toHaveText('10.8');
+  await expect(page.locator('.map-coordinate')).toHaveText('14.60050, 120.98420');
+
+  await page.unroute(tileUrl, failTiles);
+  await page.getByRole('button', { name: 'Reload map', exact: true }).click();
+  await expect(page.getByText('Map tiles are unavailable.', { exact: false })).toHaveCount(0);
+  await expect(page.getByText('Loading the street map…')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Finish trip', exact: true }).click();
+  await expect(page.getByText('Trip finished', { exact: true })).toBeVisible();
+});
+
+test('map controls support zoom, manual panning, recentering, and responsive widths', async ({ page }) => {
+  await fakeGps(page);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Start trip', exact: true }).click();
+  await expect(page.locator('.route-location-marker')).toBeAttached();
+  await page.locator('.route-map').scrollIntoViewIfNeeded();
+  await page.getByRole('button', { name: 'Zoom in', exact: true }).click();
+  await page.getByRole('button', { name: 'Zoom out', exact: true }).click();
+  const mapBox = await page.locator('.route-map').boundingBox();
+  await page.mouse.move(mapBox!.x + mapBox!.width / 2, mapBox!.y + mapBox!.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(mapBox!.x + mapBox!.width / 2 + 60, mapBox!.y + mapBox!.height / 2 + 30, { steps: 5 });
+  await page.mouse.up();
+  await expect(page.getByText('Map moved.', { exact: false })).toBeVisible();
+  await page.getByRole('button', { name: 'Center on me' }).click();
+  await expect(page.getByText('Following your GPS location.', { exact: false })).toBeVisible();
+
+  for (const width of [320, 390, 640, 768, 960, 1280]) {
+    await page.setViewportSize({ width, height: 900 });
+    const overflow = await page.evaluate(() => {
+      const content = document.querySelector('ion-content')!.shadowRoot!.querySelector('.inner-scroll')!;
+      return content.scrollWidth > content.clientWidth;
+    });
+    expect(overflow, `map overflow at ${width}px`).toBe(false);
+    for (const label of ['Center on me', 'Zoom in', 'Zoom out']) {
+      const box = await page.getByRole('button', { name: label, exact: true }).boundingBox();
+      expect(box!.width).toBeGreaterThanOrEqual(44);
+      expect(box!.height).toBeGreaterThanOrEqual(44);
+    }
+  }
+  const attribution = page.getByRole('link', { name: 'OpenStreetMap', exact: true });
+  await expect(attribution).toHaveAttribute('href', 'https://www.openstreetmap.org/copyright');
+  await page.getByRole('button', { name: 'Center on me' }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.route-map')).toHaveAttribute('tabindex', '0');
+  await page.getByRole('button', { name: 'Finish trip', exact: true }).click();
+});
+
+test('a map initialization error leaves the existing trip functions working', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await fakeGps(page);
+  await page.goto('/');
+  await page.evaluate(() => {
+    const OriginalResizeObserver = window.ResizeObserver;
+    window.ResizeObserver = class extends OriginalResizeObserver {
+      override observe(target: Element, options?: ResizeObserverOptions): void {
+        if (target.classList.contains('route-map')) throw new Error('Map fixture initialization failure');
+        super.observe(target, options);
+      }
+    };
+  });
+  await page.getByRole('button', { name: 'Start trip', exact: true }).click();
+  await expect(page.getByText('The map could not open.')).toBeVisible();
+  await expect.poll(() => gpsAction(page, 'watching')).toBe(true);
+  await gpsAction(page, 'emit', [14.6005, 120.9842, 3, 5, Date.now() + 10000]);
+  await expect(page.getByTestId('distance')).toHaveText('0.11');
+  await expect(page.getByTestId('speed')).toHaveText('10.8');
+  await page.getByRole('button', { name: 'mi', exact: true }).click();
+  await expect(page.getByTestId('speed')).toHaveText('6.7');
+  await page.getByRole('button', { name: 'Finish trip', exact: true }).click();
+  await expect(page.getByText('Trip finished', { exact: true })).toBeVisible();
+  expect(await gpsAction(page, 'watching')).toBe(false);
+  expect(errors).toEqual([]);
 });
