@@ -1,9 +1,13 @@
-import { Component, HostListener, OnDestroy, signal } from '@angular/core';
+import { Component, HostListener, OnDestroy, inject, signal } from '@angular/core';
 import { DecimalPipe, DatePipe } from '@angular/common';
 import { IonButton, IonContent, IonSpinner } from '@ionic/angular';
 import { Capacitor } from '@capacitor/core';
 import { Geolocation, type Position, type PositionOptions } from '@capacitor/geolocation';
 import { TrackingMapComponent } from '../tracking-map/tracking-map.component';
+import { TripHistoryComponent } from '../history/trip-history.component';
+import { TripStore } from '../history/trip-store.service';
+import { AuthService } from '../data/auth.service';
+import { newTripId, snapshotRoute, type Trip } from '../history/trip';
 import { prepareBackgroundTracking, startLocationWatch, stopLocationWatch, supportsBackgroundTracking } from './location-watch';
 import {
   displayDistance, displaySpeed, distanceBetween, formatDuration, isUsablePoint, movementBetween,
@@ -13,11 +17,16 @@ import {
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [IonButton, IonContent, IonSpinner, DecimalPipe, DatePipe, TrackingMapComponent],
+  imports: [IonButton, IonContent, IonSpinner, DecimalPipe, DatePipe, TrackingMapComponent, TripHistoryComponent],
   templateUrl: './home.page.html',
   styleUrl: './home.page.scss',
 })
 export class HomePage implements OnDestroy {
+  readonly trips = inject(TripStore);
+  private readonly auth = inject(AuthService);
+  readonly savingTrip = signal(false);
+  readonly saveError = signal('');
+  private completedTrip: Trip | null = null;
   readonly canTrackInBackground = supportsBackgroundTracking();
   readonly platformName = Capacitor.getPlatform() === 'ios' ? 'iOS' : 'Android';
   readonly status = signal<'ready' | 'locating' | 'tracking' | 'finished'>('ready');
@@ -37,6 +46,11 @@ export class HomePage implements OnDestroy {
   private watchId: string | null = null;
   private timerId: ReturnType<typeof setInterval> | null = null;
   private session = 0;
+
+  constructor() { void this.trips.load(); }
+
+  @HostListener('window:online')
+  onOnline(): void { void this.trips.refresh(); }
 
   private readonly locationOptions: PositionOptions = {
     enableHighAccuracy: true,
@@ -78,8 +92,18 @@ export class HomePage implements OnDestroy {
     return this.status() === 'tracking' && point !== null && this.now() - point.timestamp > 15000;
   }
 
+  get controlNote(): string {
+    if (this.status() !== 'finished') {
+      return this.canTrackInBackground ? `${this.platformName} keeps recording with the screen locked. Tap Finish trip to stop.` : 'Keep this app open and your screen awake.';
+    }
+    if (!this.completedTrip) return 'Tracking stopped before a trip could be saved.';
+    if (this.savingTrip()) return 'Saving this trip on your device…';
+    if (this.saveError()) return 'Retry saving before starting another trip.';
+    return 'Trip kept in your history. Open the clock icon above to view it.';
+  }
+
   async startTrip(): Promise<void> {
-    if (this.status() === 'locating' || this.status() === 'tracking') return;
+    if (this.status() === 'locating' || this.status() === 'tracking' || this.savingTrip() || this.saveError()) return;
 
     const session = ++this.session;
     this.resetReadings();
@@ -158,7 +182,24 @@ export class HomePage implements OnDestroy {
     this.speedMetersPerSecond.set(null);
     this.status.set('finished');
     this.stopTimer();
+    this.completedTrip = {
+      id: newTripId(), user_id: this.auth.user()!.id,
+      started_at: new Date(this.startedAt()!).toISOString(), finished_at: new Date(Math.max(this.finishedAt()!, this.startedAt()!)).toISOString(),
+      distance_meters: this.distanceMeters(), duration_seconds: this.elapsedSeconds,
+      unit: this.unit(), route: snapshotRoute(this.routePoints()), background: 0, syncState: 'pending',
+    };
+    const save = this.saveFinishedTrip();
     await this.stopWatcher();
+    await save;
+  }
+
+  async saveFinishedTrip(): Promise<void> {
+    if (!this.completedTrip || this.savingTrip()) return;
+    this.savingTrip.set(true);
+    this.saveError.set('');
+    try { await this.trips.save(this.completedTrip); }
+    catch (error) { this.saveError.set((error as Error).message); }
+    finally { this.savingTrip.set(false); }
   }
 
   @HostListener('document:visibilitychange')
@@ -227,6 +268,7 @@ export class HomePage implements OnDestroy {
   }
 
   private resetReadings(): void {
+    this.completedTrip = null;
     this.startPoint.set(null);
     this.latestPoint.set(null);
     this.routePoints.set([]);

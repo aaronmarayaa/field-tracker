@@ -13,6 +13,8 @@ npm start
 
 Open the local URL printed in the terminal. Allow location when asked. Start outdoors for a better GPS signal, move, then tap **Finish trip**.
 
+Sign in or create an account to begin. Follow [Supabase setup](SUPABASE_SETUP.md) to enable cloud history on your project.
+
 If the Ionic CLI is installed, you can also run `ionic serve`. The Angular project is named `app` to match the Ionic CLI's default target, so no extra project flag is needed.
 
 Browser location needs HTTPS or localhost. Opening an HTTP address from another device on your Wi-Fi will usually prevent location access. Use a native Android or iOS build for a walk with your phone.
@@ -37,7 +39,9 @@ On **iOS**, the native app uses the same background-location plugin, with iOS lo
 
 A fully powered-off phone cannot record GPS. Force-stopping the app or Android terminating its process also ends this in-memory session. Some phones' battery restrictions can interrupt services; if that happens, allow unrestricted battery use for Field Tracker in Android settings.
 
-Trip data stays in memory. Starting another trip clears it; reloading or closing the app loses it. There is no account, database, or trip history.
+A trip being recorded stays in memory. **Finish trip** keeps a device copy and syncs the completed trip to the signed-in account through Supabase REST. If the network is unavailable, the trip stays in history and syncs on reconnection or **Refresh trips**. Starting another trip clears the live readings and keeps saved history.
+
+Open the history clock at the top of the tracker. Each trip keeps the unit used at Finish and shows its route, distance, average pace, and elapsed time over a background. The black-and-white starting-line photo is the default. You can select another supplied image or take a camera photo that stays on the device. **Save trip image** downloads a PNG in a browser and writes it to Documents in the native app.
 
 ## Read the code in this order
 
@@ -46,6 +50,9 @@ Trip data stays in memory. Starting another trip clears it; reloading or closing
 | `src/app/home/home.page.html` | The screen: readings, controls, and location log. |
 | `src/app/home/home.page.ts` | `startTrip()`, `recordPosition()`, and `finishTrip()`. |
 | `src/app/home/tracking.ts` | Distance, unit conversions, and time formatting. |
+| `src/app/data/auth.service.ts` | Email/password registration, sign-in, and REST session refresh. |
+| `src/app/history/trip-store.service.ts` | Saves the trip on this device, syncs it, and loads history through REST. |
+| `src/app/history/trip-history.component.ts` | History, background selection, local camera, and PNG export. |
 | `src/app/home/location-watch.ts` | Chooses the native Android/iOS background watcher or the browser watcher, and stops the correct one. |
 | `src/app/tracking-map/tracking-map.component.ts` | Creates the map, draws accepted GPS points, and cleans up its map instance. |
 | `src/app/tracking-map/tracking-map.component.html` | Map states, legend, and Center on me control. |
@@ -72,7 +79,7 @@ Dragging the map pauses automatic centering. **Center on me** resumes following.
 
 Leaflet is bundled with the app; the street tiles are loaded from OpenStreetMap with visible attribution. This uses the standard [OpenStreetMap tile service](https://operations.osmfoundation.org/policies/tiles/), with normal browser caching and no bulk or offline downloads. The Android WebView identifies itself as Field Tracker through its appended user agent.
 
-All distance is kept in **meters**, all speed in **meters per second**. Unit buttons change only the display. `distanceBetween()` uses the Haversine formula to calculate the distance along the earth between two coordinates. The page adds traveled segments rather than measuring a straight line from start to finish.
+All distance is kept in **meters**, all speed in **meters per second**. Unit buttons change the live display; the unit selected at Finish is also saved with that trip. `distanceBetween()` uses the Haversine formula to calculate the distance along the earth between two coordinates. The page adds traveled segments rather than measuring a straight line from start to finish. History pace is elapsed seconds divided by distance in the saved unit, including stops.
 
 GPS measurements are estimates. This version ignores readings with accuracy worse than 50 m, movements below a small noise threshold, old timestamps, and jumps faster than 100 m/s. These simple filters reduce obvious errors but can miss short or slow movements and cannot match a mature fitness tracker. Speed falls back to distance divided by time if the phone does not supply it. A speed reading older than 15 seconds is hidden.
 
@@ -140,6 +147,6 @@ npx playwright install chromium
 npm run test:ui
 ```
 
-Calculation tests use Node's built-in test runner. Browser tests cover the original controls plus map movement, route reset, unavailable tiles, recentering, zoom, and map failure isolation. Native-bridge fixtures verify Android and iOS hidden-state recording, batched route fixes, native permission behavior, and watcher cleanup. These simulations do not replace real-device screen-lock tests. Test coordinates and map tiles are fixtures, never preloaded into the app. The iOS workflow also runs `python -m unittest discover -s tests -p 'ios_signing_test.py'` to check its signing configuration helper.
+Calculation tests use Node's built-in test runner. Browser tests cover the original controls, map tracking, account isolation, trip history, offline saves, background selection, and image export. Native-bridge fixtures exercise hidden-state recording, camera, and local file handling without a real device. Test coordinates, map tiles, accounts, and trips are fixtures, never preloaded into the app. The iOS workflow also runs `python -m unittest discover -s tests -p 'ios_signing_test.py'` to check its signing configuration helper.
 
 Read `VERIFICATION.md` for the recorded checks and the antislop delivery gate.

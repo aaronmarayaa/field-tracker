@@ -13,3 +13,4 @@ build/
 *.mobileprovision
 *.ipa
 __pycache__/
+supabase/.temp/

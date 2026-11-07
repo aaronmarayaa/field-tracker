@@ -24,6 +24,16 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Take a photo to use as the background of a saved trip image.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Allow Field Tracker to save the photo you take for a trip.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Save the photo you take to this iPhone's photo library.</string>
+	<key>UIFileSharingEnabled</key>
+	<true/>
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<true/>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Field Tracker uses your location to show your route, distance, and speed during a trip.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>

@@ -1,0 +1,22 @@
+<ion-content>
+  <main class="auth-screen">
+    <div class="auth-photo" aria-hidden="true"><img src="assets/trip-backgrounds/starting-line.png" alt="" /></div>
+    <section class="auth-form">
+      <p class="auth-wordmark">Field Tracker<span>.</span></p>
+      <p class="auth-kicker">Your next starting line.</p>
+      <h1>{{ registering() ? 'Make it yours.' : 'Back for more.' }}</h1>
+      <p class="auth-intro">{{ registering() ? 'Create an account to keep your trips together.' : 'Sign in to record a trip or revisit your miles.' }}</p>
+      <form ngNativeValidate (ngSubmit)="submit()">
+        <label for="email">Email address</label>
+        <input id="email" name="email" type="email" [(ngModel)]="email" autocomplete="username" required maxlength="254" [disabled]="busy()" />
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" [(ngModel)]="password" [attr.autocomplete]="registering() ? 'new-password' : 'current-password'" required [attr.minlength]="registering() ? 8 : null" [disabled]="busy()" />
+        @if (registering()) { <p class="password-note">Use at least 8 characters. Remember your sign-in details to find your trips again.</p> }
+        @if (error()) { <p class="auth-error" role="alert">{{ error() }}</p> }
+        <button class="auth-submit" type="submit" [disabled]="busy()">{{ busy() ? 'Connecting…' : registering() ? 'Create account' : 'Sign in' }}</button>
+      </form>
+      <button class="mode-switch" type="button" (click)="toggleMode()" [disabled]="busy()">{{ registering() ? 'Already have an account? Sign in' : 'New here? Create an account' }}</button>
+      <p class="auth-footnote">Record a route. Keep the effort.</p>
+    </section>
+  </main>
+</ion-content>

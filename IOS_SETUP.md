@@ -103,6 +103,6 @@ In Xcode, select the **App** target, choose your team and registered bundle ID u
 
 Allow precise location when asked and allow background access when iOS requests it. If needed, use **Settings > Privacy & Security > Location Services > Field Tracker** to allow **Always** and **Precise Location**. Start the trip while the app is visible, wait for the initial fix and recording state, then lock the screen for at least six minutes while moving outdoors. Reopen the app and confirm the elapsed time, traveled distance, and route. Finish and verify that location recording stops. Repeat with denied permissions to check the recovery instructions.
 
-iOS controls background delivery and may suspend or terminate an app. Force-quitting, turning the phone completely off, or losing the app process ends this in-memory session. No trip recovery or persistent history is implemented. A web browser still requires the screen to stay awake.
+iOS controls background delivery and may suspend or terminate an app. Force-quitting, turning the phone completely off, or losing the app process ends the trip being recorded. Completed trips remain in history after Finish. A web browser still requires the screen to stay awake.
 
 The iOS source and workflow are prepared from Windows. Actual Xcode compilation, Apple signing/upload, beta approval, and physical iPhone background behavior must be verified on the macOS runner and a device; they cannot be confirmed by browser fixtures.

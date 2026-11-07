@@ -6,6 +6,9 @@
         <button type="button" [class.selected]="unit() === 'km'" [attr.aria-pressed]="unit() === 'km'" (click)="unit.set('km')">km</button>
         <button type="button" [class.selected]="unit() === 'mi'" [attr.aria-pressed]="unit() === 'mi'" (click)="unit.set('mi')">mi</button>
       </div>
+      <button type="button" class="history-button" aria-label="Trip history" [disabled]="status() === 'tracking' || status() === 'locating' || savingTrip() || !!saveError()" (click)="history.open()" title="Open trip history after finishing your trip">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 11a9 9 0 1 1 2.5 7M3 5v6h6M12 7v5l3 2" /></svg>
+      </button>
     </header>
 
     <div class="trip-heading">
@@ -77,9 +80,10 @@
           } @else if (status() === 'tracking') {
             <ion-button class="primary-action" expand="block" (click)="finishTrip()"><span class="stop-mark" aria-hidden="true"></span>Finish trip</ion-button>
           } @else {
-            <ion-button class="primary-action" expand="block" (click)="startTrip()"><span class="start-mark" aria-hidden="true"></span>{{ status() === 'finished' ? 'Start another trip' : 'Start trip' }}</ion-button>
+            <ion-button class="primary-action" expand="block" [disabled]="savingTrip() || !!saveError()" (click)="startTrip()"><span class="start-mark" aria-hidden="true"></span>{{ status() === 'finished' ? 'Start another trip' : 'Start trip' }}</ion-button>
           }
-          <p class="control-note">{{ status() === 'finished' ? 'Starting again clears this trip. Nothing is saved after reloading.' : canTrackInBackground ? platformName + ' keeps recording with the screen locked. Tap Finish trip to stop.' : 'Keep this app open and your screen awake.' }}</p>
+          <p class="control-note">{{ controlNote }}</p>
+          @if (saveError()) { <div class="notice error-notice" role="alert"><p>{{ saveError() }}</p><button type="button" class="text-button" (click)="saveFinishedTrip()">Retry saving trip</button></div> }
         </div>
 
         @if (error()) {
@@ -90,7 +94,17 @@
         }
       </section>
 
-      <section class="location-log" aria-labelledby="location-heading">
+      <app-tracking-map
+        class="workspace-map"
+        [startPoint]="startPoint()"
+        [latestPoint]="latestPoint()"
+        [points]="routePoints()"
+        [finished]="status() === 'finished'"
+        [locating]="status() === 'locating'"
+      />
+    </div>
+
+      <section class="location-log ground-section" aria-labelledby="location-heading">
         <div class="log-heading"><h2 id="location-heading">Your ground covered.</h2><span>Trip log</span></div>
         <div class="journey">
           <article class="location-entry start-entry">
@@ -132,19 +146,11 @@
         </div>
         <p class="log-note">Your start and finish, recorded in coordinates. Distance follows your GPS readings along the way.</p>
       </section>
-    </div>
-
-    <app-tracking-map
-      [startPoint]="startPoint()"
-      [latestPoint]="latestPoint()"
-      [points]="routePoints()"
-      [finished]="status() === 'finished'"
-      [locating]="status() === 'locating'"
-    />
 
     <footer class="page-footer">
       <span>Made for the miles ahead.</span>
-      <span>{{ canTrackInBackground ? platformName + ' background GPS' : 'Foreground GPS' }} · No account needed</span>
+      <span>{{ canTrackInBackground ? platformName + ' background GPS' : 'Foreground GPS' }} · Private trip history</span>
     </footer>
   </main>
 </ion-content>
+<app-trip-history #history />

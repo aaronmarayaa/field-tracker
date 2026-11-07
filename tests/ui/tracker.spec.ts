@@ -1,9 +1,11 @@
 import { expect, test, type Page } from '@playwright/test';
+import { mockSupabase } from './supabase-fixture';
 
 const tileUrl = 'https://tile.openstreetmap.org/**';
 const tileFixture = '<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><rect width="256" height="256" fill="#e8ebdf"/><text x="16" y="128" fill="#46513f" font-size="14">Map tile fixture</text></svg>';
 
 test.beforeEach(async ({ page }) => {
+  await mockSupabase(page);
   await page.route(tileUrl, (route) => route.fulfill({ contentType: 'image/svg+xml', body: tileFixture }));
 });
 
@@ -188,13 +190,15 @@ test('phone, tablet, and desktop reflow without overflow; all controls support k
   }
   await page.setViewportSize({ width: 390, height: 844 });
   await page.locator('.page-footer').scrollIntoViewIfNeeded();
-  await expect(page.getByText('Foreground GPS · No account needed')).toBeInViewport();
+  await expect(page.getByText('Foreground GPS · Private trip history')).toBeInViewport();
   await page.locator('.wordmark').scrollIntoViewIfNeeded();
   await page.keyboard.press('Tab');
   await expect(page.getByRole('button', { name: 'km', exact: true })).toBeFocused();
   await page.keyboard.press('Tab');
   await page.keyboard.press('Enter');
   await expect(page.getByRole('button', { name: 'mi', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('button', { name: 'Trip history', exact: true })).toBeFocused();
   await page.keyboard.press('Tab');
   await page.keyboard.press('Enter');
   await expect(page.getByText('Recording your trip')).toBeVisible();

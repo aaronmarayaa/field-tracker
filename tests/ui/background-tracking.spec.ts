@@ -1,4 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
+import { mockSupabase } from './supabase-fixture';
+
+test.beforeEach(async ({ page }) => { await mockSupabase(page); });
 
 async function mockNative(page: Page, platform: 'android' | 'ios' = 'android'): Promise<void> {
   await page.route('https://tile.openstreetmap.org/**', (route) => route.fulfill({

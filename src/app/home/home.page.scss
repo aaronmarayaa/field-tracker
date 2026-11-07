@@ -14,7 +14,11 @@ ion-content { --background: var(--page-background); }
   gap: 14px;
   padding-bottom: 17px;
   border-bottom: 1px solid var(--line);
+  flex-wrap: wrap;
 }
+.unit-control { margin-left: auto; }
+.history-button { display: grid; place-items: center; min-width: 44px; min-height: 44px; border: 1px solid var(--muted); border-radius: 4px; background: transparent; color: var(--ink); cursor: pointer; }
+.history-button:disabled { opacity: .5; cursor: default; }
 
 .wordmark {
   font-size: 1.15rem;
@@ -184,4 +188,11 @@ h3 { margin: 0 0 10px; font-size: 0.76rem; font-weight: 600; color: var(--muted)
   .start-entry { padding-bottom: 48px; }
   .end-entry { padding-bottom: 34px; }
   .page-footer { margin-top: 42px; }
+}
+
+.ground-section { border-left: 0; border-top: 1px solid var(--line); padding: 0; margin-top: 32px; }
+.ground-section .log-heading { padding-top: 24px; }
+@media (min-width: 680px) {
+  .ground-section .journey { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px; }
+  .ground-section .start-entry::before { display: none; }
 }

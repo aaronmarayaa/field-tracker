@@ -37,3 +37,4 @@ app-tracking-map .leaflet-container { color-scheme: light; }
 @media (min-width: 1120px) {
   app-tracking-map .route-map { height: 420px; }
 }
+app-tracking-map.workspace-map .tracking-map { margin-top: 0; padding-top: 0; border-top: 0; }

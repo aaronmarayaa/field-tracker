@@ -1,6 +1,63 @@
 # Verification
 
-Checked on November 3, 2026 (Asia/Manila). This report covers the web implementation, simulated Android/iOS bridge behavior, and native project/workflow preparation. Native compilation, Apple signing/upload, and physical screen-lock/GPS accuracy are not verified here.
+Checked on November 3 and 7, 2026 (Asia/Manila). This report covers the web implementation, simulated Android/iOS bridge behavior, and native project/workflow preparation. Native compilation, Apple signing/upload, physical camera use, and physical screen-lock/GPS accuracy are not verified here.
+
+## Trip history and login, November 7
+
+- PASS: the production Angular build completed (738.50 kB initial raw bundle). Capacitor synced Android and iOS with all six plugins, including Camera, Filesystem, and Share. The two build workflows, tracking calculations, location watcher, and Leaflet logic are unchanged.
+- PASS: the 19-test Playwright run and a separate storage/image retry test passed. The 6 calculation tests and 4 signing-helper tests also passed.
+- PASS: UI fixtures verified registration, incorrect passwords, account separation, session refresh, history pagination, the route above Ground covered, one save on Finish, fixed per-trip units, preset persistence, offline reload and retry, and recovery from device storage and image failures.
+- PASS: the native bridge test requested gallery saving, kept the photo on the device across reload, wrote the trip image to Documents, and shared from the cache. It observed no cloud write when taking the photo. The browser download was a 1080 × 1440 PNG.
+- PASS: the exact migration ran in a local PostgreSQL engine with mock auth users. It permitted own-trip insert and idempotent update, denied access without authentication, blocked cross-account reads and writes, and prevented moving a trip to another account.
+- PASS: the live project's public Auth settings confirmed email sign-in enabled and confirmation disabled. The live trips endpoint still returned `PGRST205` at the last check; the user will run the migration in SQL Editor. Authenticated live writes were simulated locally and were not verified against the hosted table.
+- PASS: SHA-256 hashes matched all three supplied backdrop files. Test screenshots and a poster with a simulated route are in the local `build/preview/` folder.
+
+### Delivery gate for history and login
+
+- R-02 PASS: new app copy and setup instructions use no em dash.
+- R-03 PASS: tracker reflow checks passed from 320 to 1280 px; the trip dialog had no overflow at 320, 390, 768, and 1280 px.
+- R-17 PASS: distance, pace, and time are derived from saved trip data, including the stored unit.
+- R-18 PASS: no invented athlete, customer, or testimonial appears in the app.
+- R-23 PASS: the three supplied photos are used as requested; the first reference only guides the composition.
+- R-24 PASS: the clock, Back to trips, Back to tracker, and Close open or return to real views.
+- R-25 PASS: muted text on the dark surface is 8.50:1; primary buttons are 7.07:1. The orange route and its dark outline are 7.14:1. The poster fade keeps white type readable on the supplied and simulated camera backgrounds.
+- R-26 PASS: registration, sign-in, sign-out, history refresh, loading older trips, background selection, camera, save, share, and both retry actions have exercised handlers.
+- R-27 PASS: tests exercised loading, first-trip, offline, wrong-password, and image/storage retry states with actionable copy.
+- R-28 PASS: no FAQ or filler content was added.
+- R-32 PASS: tracker keyboard navigation and dialog Escape were exercised; detail focus moves to Back to trips and focus outlines are visible.
+- R-33 PASS: layout and features are in the app source. Test fixtures are confined to the test suite.
+- R-34 PASS: the existing dark theme covers login, history, and detail; no theme control was added.
+- R-35 PASS: the production build, click-through tests, local database policy checks, and visual inspection of the exported poster and phone/desktop detail views are recorded above.
+- R-36 PASS: the app distinguishes device copies from Supabase saves, and the setup report distinguishes local tests from the pending hosted table.
+- R-37 PASS: the existing sporty direction and ENERGY 3 / RHYTHM 2 / MOTION 1 are recorded in `DESIGN.md`, applied to the supplied poster reference.
+- R-38 PASS: the empty history has no sample rows. Simulated trips are confined to tests and labeled preview evidence.
+- R-01 PASS: the poster fade has the single purpose of keeping the statistics readable over photos.
+- R-04 PASS: the clock icon opens history; photo thumbnails select the named background.
+- R-06 PASS: condensed headings retain the sports signage character; labels and numeric values are separated by weight and size.
+- R-07 PASS: no decorative grid or dot pattern was added.
+- R-08 PASS: buttons use their action names without decorative arrows.
+- R-09 PASS: no badge repeats the headline.
+- R-10 PASS: the dialog uses a solid surface and a dim backdrop, without glass.
+- R-12 PASS: no large card shadows were added.
+- R-13 PASS: no glow was added.
+- R-14 PASS: the chronological rows differ in purpose from the portrait poster and thumbnail controls.
+- R-19 PASS: motion remains limited to interaction feedback, loading, and actual tracking.
+- R-22 PASS: all imagery is user supplied or captured on the device.
+- Liveliness PASS: the dial/route remain the live tracker instruments; the portrait poster is the detail focal point, with the orange GPS line and condensed Field Tracker title carrying the identity across views.
+- C-1 PASS: design choices and their purposes are recorded in `DESIGN.md`.
+- C-2 PASS: controls have named behavior, pending states, and recovery actions exercised by tests.
+- C-3 PASS: login protects saved trips, the history organizes them, and the detail shows and exports a specific trip.
+- C-4 PASS: phone/desktop layout, keyboard access, empty history, and failed saves were exercised.
+- C-5 PASS: tests and the setup report distinguish simulated data, actual API settings, and pending live setup.
+- R-05 PASS: login photo/form, trip rows, and portrait detail follow the content and the declared rhythm.
+- R-11 PASS: small corners mark controls; circles still represent the stopwatch and GPS endpoints.
+- R-15 PASS: Start trip, Finish trip, Refresh trips, Take a photo, and Save trip image name their actions.
+- R-16 PASS: status text describes recording, saving, and recovery in plain terms.
+- R-20 PASS: the track photography, condensed wordmark, stopwatch, and orange route remain visible identifiers.
+- R-21 PASS: the existing dark sports palette carries over to login and history.
+- R-29 PASS: charcoal, off-white, gray, and track orange are the only interface colors; the three photographs retain their original colors.
+- R-30 PASS: the image reference informs hierarchy; the result uses Field Tracker's existing wordmark, typography, and orange.
+- R-31 PASS: layout, accent, fade, photography, and content spacing have written purposes in `DESIGN.md`. Comments document device-only photos, offline sign-out, and the canvas rendering timing.
 
 ## iOS addition
 
@@ -164,4 +221,4 @@ The map and screen-off additions were checked at `http://127.0.0.1:8103` using `
 
 ## Practical limits
 
-Android SDK 36, Xcode, and connected Android/iOS phones were not available here. Native compilation, actual permission prompts, physical battery behavior, GPS accuracy, and real screen-lock behavior remain unverified. Android uses a location foreground service with a persistent notification; iOS uses the native background-location watcher and configured location background mode. A browser still needs to stay visible. Device verification should include a moving trip with the screen locked for at least six minutes, followed by Finish and confirmation that location recording stops. A fully powered-off or force-stopped phone/app cannot keep this in-memory session recording. The app stores no trip history and uses manual Finish rather than automatic arrival or address lookup.
+Android SDK 36, Xcode, and connected Android/iOS phones were not available here. Native compilation, actual permission prompts, physical camera use, battery behavior, GPS accuracy, and real screen-lock behavior remain unverified. Android uses a location foreground service with a persistent notification; iOS uses the native background-location watcher and configured location background mode. A browser still needs to stay visible. Device verification should include a moving trip with the screen locked for at least six minutes, followed by Finish and confirmation that location recording stops and the trip appears in history. A fully powered-off or force-stopped phone/app cannot keep an in-progress session recording. Completed trips persist; Finish is manual and there is no automatic arrival or address lookup.

@@ -1,0 +1,63 @@
+<dialog #dialog class="history-dialog" (cancel)="cancel($event)" aria-labelledby="history-title">
+  <div class="history-shell">
+    <header class="history-header">
+      <div>
+        <p class="history-kicker">Field Tracker</p>
+        <h2 id="history-title">{{ selected() ? 'Your effort, recorded.' : 'Trip history.' }}</h2>
+      </div>
+      <button type="button" class="close-history" (click)="close()" [disabled]="working()" aria-label="Close trip history">Close</button>
+    </header>
+
+    @if (selected(); as trip) {
+      <button type="button" class="back-button" (click)="back()" [disabled]="working()">Back to trips</button>
+      <div class="trip-detail">
+        <div class="poster-wrap">
+          <canvas #poster width="1080" height="1440" [attr.aria-label]="'Field Tracker trip: ' + distance(trip) + ' ' + trip.unit + ', pace ' + pace(trip) + ' per ' + trip.unit + ', time ' + time(trip)" role="img"></canvas>
+          @if (drawing()) { <p class="poster-feedback" role="status">Preparing your trip image…</p> }
+          @if (drawError()) { <div class="poster-feedback" role="alert"><p>{{ drawError() }}</p><button type="button" (click)="render()">Retry image</button></div> }
+        </div>
+        <section class="detail-controls" aria-label="Trip image settings">
+          <p class="trip-date">{{ trip.started_at | date:'EEEE, d MMMM y, h:mm a' }}</p>
+          <h3>Choose your backdrop.</h3>
+          <div class="background-options" role="group" aria-label="Trip image backgrounds">
+            @for (background of backgrounds; track background.src; let index = $index) {
+              <button type="button" [attr.aria-label]="background.name + ' background'" [attr.aria-pressed]="!usePhoto() && trip.background === index" (click)="chooseBackground(index)" [disabled]="working()">
+                <img [src]="background.src" alt="" /><span>{{ background.name }}</span>
+              </button>
+            }
+          </div>
+          @if (photoUrl()) { <button type="button" class="secondary-button" (click)="choosePhoto()" [attr.aria-pressed]="usePhoto()" [disabled]="working()">Use my photo</button> }
+          <button type="button" class="secondary-button camera-button" (click)="camera()" [disabled]="working()">Take a photo</button>
+          <p class="device-note">Camera photos stay on this device. Only trip readings, the route, and your preset choice sync to your account.</p>
+          <div class="export-actions">
+            <button type="button" class="primary-button" (click)="exportImage(false)" [disabled]="working() || drawing() || !!drawError()">Save trip image</button>
+            <button type="button" class="secondary-button" (click)="exportImage(true)" [disabled]="working() || drawing() || !!drawError()">Share image</button>
+          </div>
+          <p class="device-note">Pace uses total elapsed time, including stops.</p>
+          <p class="action-message" role="status">{{ working() ? 'Working…' : message() }}</p>
+        </section>
+      </div>
+    } @else {
+      <div class="history-toolbar">
+        <p>{{ auth.user()?.email }}</p>
+        <button type="button" (click)="store.refresh()" [disabled]="store.busy()">{{ store.busy() ? 'Syncing…' : 'Refresh trips' }}</button>
+      </div>
+      @if (store.error()) { <p class="history-error" role="alert">{{ store.error() }} Your device copies remain available below.</p> }
+      @if (!store.trips().length) {
+        <div class="history-empty"><h3>{{ store.busy() ? 'Loading your trips…' : 'Your first finish is ahead.' }}</h3><p>Finish a recorded trip and it will appear here with its distance, pace, time, and route.</p><button type="button" (click)="close()">Back to tracker</button></div>
+      } @else {
+        <ol class="history-list">
+          @for (trip of store.trips(); track trip.id) {
+            <li><button type="button" class="history-trip" (click)="showTrip(trip)">
+              <img [src]="backgrounds[trip.background]?.src || backgrounds[0].src" alt="" loading="lazy" />
+              <span class="history-trip-main"><span class="history-trip-date">{{ trip.started_at | date:'d MMM y' }}</span><strong>{{ distance(trip) }} <small>{{ trip.unit }}</small></strong><span class="history-trip-time">{{ trip.started_at | date:'h:mm a' }} · {{ time(trip) }}</span></span>
+              <span class="history-trip-end"><span>{{ pace(trip) }} /{{ trip.unit }}</span><small>{{ trip.syncState === 'pending' ? 'On device · waiting to sync' : 'Saved to your account' }}</small><span class="open-trip-label">View trip</span></span>
+            </button></li>
+          }
+        </ol>
+        @if (store.hasMore()) { <button type="button" class="secondary-button" (click)="store.loadMore()" [disabled]="store.busy()">Load older trips</button> }
+      }
+      <footer class="history-footer"><span>Every trip has a starting line.</span><button type="button" (click)="signOut()">Sign out</button></footer>
+    }
+  </div>
+</dialog>
